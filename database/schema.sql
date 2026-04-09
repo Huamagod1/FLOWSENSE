@@ -3,11 +3,6 @@
 -- MySQL 8.0
 -- ============================================
 
-CREATE OR REPLACE DATABASE IF NOT EXISTS flowsense_db
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE flowsense_db;
 
 -- --------------------------------------------
 -- USUARIOS

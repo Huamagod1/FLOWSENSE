@@ -10,7 +10,7 @@ services:
       MYSQL_USER: flowsense
       MYSQL_PASSWORD: flowsense123
     ports:
-      - "3306:3306"
+      - "330:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
