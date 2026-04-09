@@ -3,7 +3,7 @@
 -- MySQL 8.0
 -- ============================================
 
-CREATE DATABASE IF NOT EXISTS flowsense_db
+CREATE OR REPLACE DATABASE IF NOT EXISTS flowsense_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
@@ -13,7 +13,7 @@ USE flowsense_db;
 -- USUARIOS
 -- Base del sistema de autenticación
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS usuarios (
+CREATE OR REPLACE TABLE IF NOT EXISTS usuarios (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   nombre          VARCHAR(100)  NOT NULL,
   apellido        VARCHAR(100)  NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- TOKENS DE RECUPERACION DE CONTRASEÑA
 -- Para el flujo "olvidé mi contraseña"
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
+CREATE OR REPLACE TABLE IF NOT EXISTS password_reset_tokens (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id  INT           NOT NULL,
   token       VARCHAR(255)  NOT NULL UNIQUE,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- Preferencias y parámetros del detector
 -- Cubre HU-09: umbral de confianza
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS configuracion_usuario (
+CREATE OR REPLACE TABLE IF NOT EXISTS configuracion_usuario (
   id                    INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id            INT     NOT NULL UNIQUE,
   umbral_confianza      FLOAT   DEFAULT 0.5,
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS configuracion_usuario (
 -- Espacios comerciales del administrador
 -- Cubre HU-08: múltiples recintos
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS recintos (
+CREATE OR REPLACE TABLE IF NOT EXISTS recintos (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id  INT           NOT NULL,
   nombre      VARCHAR(150)  NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS recintos (
 -- Sectores dibujados sobre el plano
 -- Cubre HU-02: definir zonas
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS zonas (
+CREATE OR REPLACE TABLE IF NOT EXISTS zonas (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   recinto_id  INT           NOT NULL,
   nombre      VARCHAR(100)  NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS zonas (
 -- Archivos subidos para análisis
 -- Cubre HU-01: subir video MP4
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS videos (
+CREATE OR REPLACE TABLE IF NOT EXISTS videos (
   id                INT AUTO_INCREMENT PRIMARY KEY,
   recinto_id        INT           NOT NULL,
   nombre_archivo    VARCHAR(255)  NOT NULL,
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS videos (
 -- Personas detectadas por YOLOv8 por frame
 -- Generadas por detector.py
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS detecciones (
+CREATE OR REPLACE TABLE IF NOT EXISTS detecciones (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   video_id        INT     NOT NULL,
   zona_id         INT,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS detecciones (
 -- Resumen calculado por zona y video
 -- Cubre HU-03, HU-04, HU-05
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS metricas (
+CREATE OR REPLACE TABLE IF NOT EXISTS metricas (
   id                    INT AUTO_INCREMENT PRIMARY KEY,
   zona_id               INT     NOT NULL,
   video_id              INT     NOT NULL,
@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS metricas (
 -- Zonas con baja actividad detectadas
 -- Cubre HU-07: alerta zona fría
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS alertas (
+CREATE OR REPLACE TABLE IF NOT EXISTS alertas (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   zona_id     INT           NOT NULL,
   video_id    INT           NOT NULL,
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS alertas (
 -- Registro de PDFs generados
 -- Cubre HU-06: exportar reporte PDF
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS reportes (
+CREATE OR REPLACE TABLE IF NOT EXISTS reportes (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   video_id      INT           NOT NULL,
   usuario_id    INT           NOT NULL,
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS reportes (
 -- Auditoría de acciones del sistema
 -- Útil para el superadmin
 -- --------------------------------------------
-CREATE TABLE IF NOT EXISTS logs_actividad (
+CREATE OR REPLACE TABLE IF NOT EXISTS logs_actividad (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id  INT           NOT NULL,
   accion      VARCHAR(100)  NOT NULL,
@@ -220,6 +220,6 @@ INSERT INTO usuarios (nombre, apellido, email, password_hash, rol) VALUES
 ('Super', 'Admin', 'admin@flowsense.cl',
  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhuG',
  'superadmin');
-
+-- hasheo de pw de ejemplo -- 
 INSERT INTO configuracion_usuario (usuario_id, umbral_confianza, fps_procesamiento) VALUES
 (1, 0.5, 1);
