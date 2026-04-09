@@ -1,0 +1,69 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: flowsense-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: flowsense123
+      MYSQL_DATABASE: flowsense_db
+      MYSQL_USER: flowsense
+      MYSQL_PASSWORD: flowsense123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - flowsense-net
+
+  backend:
+    build: ./backend
+    container_name: flowsense-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/flowsense_db
+      SPRING_DATASOURCE_USERNAME: flowsense
+      SPRING_DATASOURCE_PASSWORD: flowsense123
+    depends_on:
+      - mysql
+    volumes:
+      - ./python:/app/python
+      - ./videos:/app/videos
+    networks:
+      - flowsense-net
+
+  python:
+    build: ./python
+    container_name: flowsense-python
+    restart: "no"
+    volumes:
+      - ./python:/app
+      - ./videos:/app/videos
+    networks:
+      - flowsense-net
+
+  frontend:
+    build: ./frontend
+    container_name: flowsense-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - flowsense-net
+
+volumes:
+  mysql_data:
+
+networks:
+  flowsense-net:
+    driver: bridge
