@@ -28,3 +28,9 @@ venv/
 # IDE local
 .idea/
 .vscode/settings.json
+
+# Archivos de prueba local del detector Python
+Producto/python/resultado*.csv
+Producto/python/zonas_prueba*.json
+Producto/python/test_*.csv
+Producto/python/test_*.json
