@@ -17,7 +17,7 @@ def escribir_deteccion(writer, id_video, frame_num, zona_id, x, y, conf):
     writer.writerow([id_video, frame_num, zona_id, round(x, 6), round(y, 6), round(conf, 4)])
 
 
-def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None):
+def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None, aborted_by_user=False):
     """Imprime en stdout la línea JSON que Spring Boot captura al terminar el proceso."""
     resumen = {
         "frames_procesados": frames,
@@ -27,5 +27,7 @@ def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None):
     }
     if mensaje is not None:
         resumen["mensaje"] = mensaje
+    if aborted_by_user:
+        resumen["aborted_by_user"] = True
     print(json.dumps(resumen))
     sys.stdout.flush()

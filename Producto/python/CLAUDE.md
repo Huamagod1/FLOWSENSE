@@ -76,9 +76,22 @@ Estos defaults están calibrados para videos de recintos comerciales con cámara
 | `imgsz` | 640 | Velocidad razonable en CPU, suficiente para personas a media distancia |
 | `fps muestreo` | 1 | 1 frame/segundo; video 15 min → 900 frames; procesable en <5 min |
 | `classes` | `[0]` | Solo clase 'person' de COCO |
-| `model` | `yolov8n.pt` | Modelo nano; sin GPU, CPU suficiente |
+| `model` | `yolov8n.pt` | **Default**. Nano; rápido en CPU. Ver tabla de modelos abajo. |
+| `max_det` | 300 | Igual al default de ultralytics 8.3. Limitar si hay ruido extremo. |
 
 Todos los parámetros deben ser **configurables por CLI** para soportar HU-09 (admin ajusta umbral). Nunca hardcodear en el cuerpo del script.
+
+### Modelos soportados
+
+| Modelo | Flag CLI | Archivo | Velocidad CPU | Cuándo usar |
+|---|---|---|---|---|
+| YOLOv8n | `--modelo yolov8n` | `modelos/yolov8n.pt` | ~1–2 s/frame | Default; CI, demos, desarrollo |
+| YOLOv8s | `--modelo yolov8s` | `modelos/yolov8s.pt` | ~3–5 s/frame | **Recomendado para producción** en escenas comerciales reales |
+| YOLOv8m | `--modelo yolov8m` | `modelos/yolov8m.pt` | ~8–12 s/frame | Oclusión extrema o cámaras de muy baja altura |
+
+> Para escenas con alta densidad de personas (>30 en el frame), recomendamos usar `--modelo yolov8s` o `--modelo yolov8m`.
+
+Los archivos `.pt` no se versionan en Git. Se descargan automáticamente por ultralytics en `modelos/` la primera vez que se invoca cada modelo.
 
 ## Filtros obligatorios antes de escribir al CSV
 

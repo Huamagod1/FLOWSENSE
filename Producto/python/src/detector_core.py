@@ -2,23 +2,25 @@ from pathlib import Path
 
 from ultralytics import YOLO
 
-_MODELO_PATH = Path(__file__).parent.parent / "modelos" / "yolov8n.pt"
+_MODELOS_DIR = Path(__file__).parent.parent / "modelos"
 
 
 class Detector:
-    def __init__(self, conf, iou, imgsz):
+    def __init__(self, conf, iou, imgsz, modelo="yolov8n"):
         self.conf = conf
         self.iou = iou
         self.imgsz = imgsz
-        self.model = YOLO(str(_MODELO_PATH))
+        modelo_path = _MODELOS_DIR / f"{modelo}.pt"
+        self.model = YOLO(str(modelo_path))
 
-    def detectar_frame(self, frame):
+    def detectar_frame(self, frame, max_det=300):
         results = self.model.predict(
             frame,
             classes=[0],
             conf=self.conf,
             iou=self.iou,
             imgsz=self.imgsz,
+            max_det=max_det,
             verbose=False,
         )
         boxes = results[0].boxes

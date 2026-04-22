@@ -1,6 +1,7 @@
 import sys
 import time
 import traceback
+from collections import deque
 
 import cv2
 
@@ -30,7 +31,7 @@ def main():
     zonas = datos_zonas["zonas"]
 
     try:
-        detector = Detector(args.conf, args.iou, args.imgsz)
+        detector = Detector(args.conf, args.iou, args.imgsz, args.modelo)
     except Exception as e:
         imprimir_resumen(0, 0, 0, status="ERROR",
                          mensaje=f"Error al cargar modelo YOLOv8: {e}")
@@ -45,10 +46,21 @@ def main():
     fps_video = cap.get(cv2.CAP_PROP_FPS) or 25.0
     frame_step = max(1, int(round(fps_video / args.fps)))
 
+    # Instanciar preview antes del loop; sale con exit 1 si no hay display
+    preview_window = None
+    if args.preview:
+        from src.preview import PreviewWindow
+        preview_window = PreviewWindow()
+
     csv_file, writer = abrir_csv(args.output)
     frames_procesados = 0
     detecciones_totales = 0
     frame_num = 0
+    aborted_by_user = False
+
+    # Promedio móvil de FPS de procesamiento (ventana de 5 frames)
+    tiempos_frame = deque(maxlen=5)
+    t_ultimo_frame = time.time()
 
     try:
         while True:
@@ -66,7 +78,7 @@ def main():
                 frame_num += 1
                 continue
 
-            detecciones = detector.detectar_frame(frame)
+            detecciones = detector.detectar_frame(frame, args.max_det)
             frames_procesados += 1
 
             for det in detecciones:
@@ -87,14 +99,31 @@ def main():
                 )
                 detecciones_totales += 1
 
+            if preview_window is not None:
+                ahora = time.time()
+                tiempos_frame.append(ahora - t_ultimo_frame)
+                t_ultimo_frame = ahora
+                fps_proc = 1.0 / (sum(tiempos_frame) / len(tiempos_frame))
+
+                accion = preview_window.mostrar(
+                    frame, zonas, detecciones,
+                    frame_num, detecciones_totales, fps_proc, args.fps,
+                )
+                if accion == "quit":
+                    aborted_by_user = True
+                    break
+
             frame_num += 1
 
     finally:
         cap.release()
         csv_file.close()
+        if preview_window is not None:
+            preview_window.cerrar()
 
     duracion = time.time() - inicio
-    imprimir_resumen(frames_procesados, detecciones_totales, duracion)
+    imprimir_resumen(frames_procesados, detecciones_totales, duracion,
+                     aborted_by_user=aborted_by_user)
 
 
 if __name__ == "__main__":
