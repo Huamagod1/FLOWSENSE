@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.\\\\venv\\\\Scripts\\\\python.exe -c \"import inspect, ultralytics; from ultralytics.models.yolo.detect.predict import DetectionPredictor; print\\(inspect.signature\\(DetectionPredictor.__init__\\)\\)\")",
+      "Bash(.\\\\venv\\\\Scripts\\\\python.exe -c \"from ultralytics import YOLO; import inspect; m=YOLO.__new__\\(YOLO\\); print\\(inspect.signature\\(m.predict\\)\\)\")",
+      "Bash(.\\\\venv\\\\Scripts\\\\python.exe -c \"import ultralytics.engine.model as em; import inspect; print\\(inspect.signature\\(em.Model.predict\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import ultralytics.engine.model as em; import inspect; print\\(inspect.signature\\(em.Model.predict\\)\\)\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(venv/Scripts/python.exe -m unittest discover -s tests -v)",
+      "Bash(venv/Scripts/python.exe detector.py --help)"
+    ]
+  }
+}
