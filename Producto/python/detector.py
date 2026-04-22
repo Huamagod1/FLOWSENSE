@@ -7,13 +7,17 @@ import cv2
 from src.cli import parsear_args
 from src.zonas import cargar_zonas, asignar_zona
 from src.filtros import frame_valido, caja_valida
-from src.detector_core import detectar_frame
 from src.output import abrir_csv, escribir_deteccion, imprimir_resumen
 
 
 def main():
     inicio = time.time()
     args = parsear_args()
+
+    if args.stub:
+        from src.detector_stub import Detector
+    else:
+        from src.detector_core import Detector
 
     # Cargar y validar zonas antes de abrir el video
     try:
@@ -24,6 +28,13 @@ def main():
 
     id_video = datos_zonas["id_video"]
     zonas = datos_zonas["zonas"]
+
+    try:
+        detector = Detector(args.conf, args.iou, args.imgsz)
+    except Exception as e:
+        imprimir_resumen(0, 0, 0, status="ERROR",
+                         mensaje=f"Error al cargar modelo YOLOv8: {e}")
+        sys.exit(1)
 
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
@@ -55,7 +66,7 @@ def main():
                 frame_num += 1
                 continue
 
-            detecciones = detectar_frame(frame, args.conf, args.iou, args.imgsz)
+            detecciones = detector.detectar_frame(frame)
             frames_procesados += 1
 
             for det in detecciones:
