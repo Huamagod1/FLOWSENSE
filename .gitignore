@@ -29,6 +29,7 @@ venv/
 .idea/
 .vscode/settings.json
 
+<<<<<<< HEAD
 
 # Claude Code local config
 .claude/
@@ -39,3 +40,10 @@ Producto/python/zonas_prueba*.json
 Producto/python/zonas_con_bom*.json
 zonas_prueba.json
 zonas_con_bom.json
+=======
+# Archivos de prueba local del detector Python
+Producto/python/resultado*.csv
+Producto/python/zonas_prueba*.json
+Producto/python/test_*.csv
+Producto/python/test_*.json
+>>>>>>> dccf8b3 (implementa esqueleto de detector.py con stub dummy y pipeline funcional)
