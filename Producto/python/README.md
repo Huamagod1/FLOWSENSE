@@ -21,9 +21,16 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> El modelo `yolov8n.pt` se descarga automáticamente en `modelos/` la primera
-> vez que se ejecuta con la lógica YOLO real. El esqueleto actual usa un stub
-> y no requiere descarga.
+> **Advertencia:** `ultralytics` instala PyTorch como dependencia (~1 GB de descarga
+> la primera vez). Asegúrate de tener buena conexión antes de ejecutar `pip install`.
+
+> **Primera ejecución:** al correr el detector con YOLO real, `yolov8n.pt` (~6 MB)
+> se descarga automáticamente en `modelos/`. Las ejecuciones siguientes usan el
+> archivo local y no requieren red.
+
+> **Desarrollo sin YOLO:** usa `--stub` para correr el pipeline completo con
+> detecciones ficticias sin instalar PyTorch (solo necesitas `opencv-python-headless`
+> y `numpy`).
 
 ---
 
@@ -52,6 +59,7 @@ Ejecuta desde la carpeta `Producto/python/` con el video de prueba ubicado en
 `/video/p.mp4` en la raíz del repositorio:
 
 ```bash
+# Con YOLO real (requiere ultralytics instalado; descarga yolov8n.pt en la primera ejecución)
 python detector.py \
   --video ../../video/p.mp4 \
   --output resultado.csv \
@@ -60,6 +68,13 @@ python detector.py \
   --conf 0.45 \
   --iou 0.7 \
   --imgsz 640
+
+# Con stub (sin PyTorch, útil para desarrollo o CI sin GPU)
+python detector.py \
+  --video ../../video/p.mp4 \
+  --output resultado.csv \
+  --zonas zonas_prueba.json \
+  --stub
 ```
 
 ### Paso 3 — Verificar la salida
@@ -139,3 +154,15 @@ python -m unittest discover -s tests -v
 | `--conf` | no | `0.45` | Umbral de confianza |
 | `--iou` | no | `0.7` | Umbral IoU para NMS |
 | `--imgsz` | no | `640` | Tamaño de entrada del modelo |
+| `--stub` | no | `false` | Usar detecciones ficticias sin cargar YOLO |
+
+---
+
+## Parámetros de detección y rangos recomendados
+
+| Parámetro | Default | Rango útil | Efecto al subir el valor |
+|---|---|---|---|
+| `--conf` | `0.45` | `0.30 – 0.70` | Menos detecciones, mayor precisión; sube si hay muchos falsos positivos |
+| `--iou` | `0.70` | `0.50 – 0.85` | Fusiona cajas más agresivamente; sube si personas cercanas se duplican |
+| `--fps` | `1` | `0.5 – 5` | Más frames muestreados por segundo; sube para vídeos con movimiento rápido |
+| `--imgsz` | `640` | `320 – 1280` | Mayor resolución, más lento; sube si las personas aparecen pequeñas en el frame |
