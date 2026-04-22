@@ -34,3 +34,6 @@ Producto/python/resultado*.csv
 Producto/python/zonas_prueba*.json
 Producto/python/test_*.csv
 Producto/python/test_*.json
+Producto/python/tests/test_carga_zonas.py
+Producto/python/zonas_con_bom.json
+zonas_prueba.json
