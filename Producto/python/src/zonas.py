@@ -4,7 +4,7 @@ import json
 def cargar_zonas(ruta_json):
     """Lee y valida el JSON de zonas. Lanza FileNotFoundError o ValueError si hay problema."""
     try:
-        with open(ruta_json, "r", encoding="utf-8") as f:
+        with open(ruta_json, "r", encoding="utf-8-sig") as f:
             datos = json.load(f)
     except FileNotFoundError:
         raise FileNotFoundError(f"Archivo de zonas no encontrado: {ruta_json}")
