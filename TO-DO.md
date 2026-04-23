@@ -1,0 +1,6 @@
+-Dinamizar las areas a detectar mediante un front el cual va a un back y recibe el modelo
+-Dinamizar las variables de resolucion
+-Dinamizar cantidad de areas
+-Resolver temas de exportacion de datos a los CSV o BD
+-Establecer fiabilidad
+-
