@@ -174,3 +174,58 @@ Tests de integración con YOLO real no son requeridos para Sprint 2. Basta con l
 - No proponer extraer embeddings faciales, landmarks, o cualquier feature biométrico.
 - No mezclar la lógica de Python con acceso directo a MySQL. El contrato es CSV + stdout.
 - No usar `opencv-python` (versión con GUI) en lugar de `opencv-python-headless`.
+
+
+## Modo adicional: extracción de frame
+
+Además del modo de detección principal, el módulo soporta un modo 
+de extracción de frame representativo para el editor de zonas:
+
+Invocación:
+python detector.py --modo extraer-frame --video <ruta> --frame-output <ruta.png>
+
+Comportamiento:
+- Abre el video con OpenCV
+- Va al segundo 5 del video (configurable con --frame-segundo)
+- Extrae ese frame
+- Lo guarda como PNG en la ruta especificada
+- Imprime JSON: {"frame_extraido": true, "ruta": "<ruta>", "status": "OK"}
+- No hace inferencia YOLO
+
+Este modo es invocado por Spring Boot al recibir el upload, ANTES 
+de que el admin defina las zonas.
+
+## Modelos soportados y selección
+
+El parámetro --modelo acepta: yolov8n (default), yolov8s, yolov8m.
+
+Para escenas con más de 20 personas simultáneas en el frame, 
+usar --modelo yolov8s o --modelo yolov8m.
+
+El modelo se descarga automáticamente en modelos/ la primera vez.
+
+## Por qué YOLO y las zonas son conceptos separados
+
+YOLO detecta personas en TODO el frame sin saber nada de zonas.
+Las zonas son un filtro posterior aplicado en Python después de 
+la detección. Una detección se asigna a la zona que contiene su 
+punto central. Si cae fuera de todas las zonas, se descarta.
+
+Esto permite que el admin defina zonas de interés sin que el modelo 
+necesite ser reentrenado o reconfigurado.
+
+## Flags adicionales disponibles
+
+--stub:          usar detecciones dummy sin cargar YOLO (desarrollo sin GPU)
+--preview:       mostrar ventana OpenCV con bounding boxes en tiempo real
+--modelo:        elegir yolov8n/s/m
+--max-det:       máximo de detecciones por frame (default 300)
+--modo:          'detectar' (default) o 'extraer-frame'
+--frame-segundo: segundo del video para extraer frame (default 5)
+
+## Troubleshooting común
+
+numpy no instala → probablemente Python 3.13+, instalar Python 3.12
+BOM en JSON → usar utf-8-sig (ya implementado en cargar_zonas)
+Video no encontrado → usar rutas relativas desde Producto/python/
+Ruta con espacios → encerrar en comillas

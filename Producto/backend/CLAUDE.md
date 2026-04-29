@@ -234,3 +234,64 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173,https://<vercel-url>
 - **No** procesar video de forma sincrónica bloqueando el request HTTP.
 - **No** implementar roles adicionales más allá de ADMIN sin actualizar primero `ALCANCE_COMPLETO.md`.
 - **No** agregar campos a `DETECCIONES` o `METRICAS` que puedan permitir identificación individual de personas.
+
+## Flujo de orquestación con editor de zonas
+
+El flujo de procesamiento tiene 2 fases de invocación a Python:
+
+Fase 1 — Extracción de frame (al subir el video):
+ProcessBuilder invoca: python detector.py --modo extraer-frame 
+                       --video <ruta> --frame-output <ruta.png>
+Duración: ~2-3 segundos
+Resultado: imagen PNG guardada, estado del video → FRAME_LISTO
+
+Fase 2 — Detección completa (cuando el admin guarda las zonas):
+ProcessBuilder invoca: python detector.py --video ... --zonas ... 
+                       --conf ... --modelo ...
+Duración: proporcional al video (~1-2 min por minuto de video)
+Resultado: CSV con detecciones, métricas calculadas, estado → COMPLETADO
+
+Nunca lanzar Fase 2 sin que las zonas estén guardadas en BD.
+
+## Estados del video (actualizados)
+
+PENDIENTE → FRAME_LISTO → ESPERANDO_ZONAS → PROCESANDO → COMPLETADO | ERROR
+
+FRAME_LISTO: el frame representativo fue extraído exitosamente
+ESPERANDO_ZONAS: el admin abrió el editor pero no ha guardado aún
+(el sistema no avanza a PROCESANDO hasta que el admin confirme)
+
+## Nuevo endpoint: extraer frame preview
+
+GET /api/videos/{id}/frame-preview
+- Verifica que el video existe y pertenece a la organización
+- Invoca Python en modo extraer-frame si no existe ya el PNG
+- Devuelve: {"url_frame": "/frames/{uuid}.png", "ancho": 1920, "alto": 1080}
+- El ancho y alto del frame son necesarios para que el frontend 
+  calcule correctamente las coordenadas normalizadas
+
+## Cálculo de métricas expandido
+
+Spring Boot calcula estas métricas por cada zona al completar el análisis:
+
+- total_detecciones: COUNT de filas de la zona
+- porcentaje_del_total: total_zona / total_video * 100  
+- densidad_promedio: total_zona / frames_procesados
+- pico_maximo: MAX(detecciones en un mismo frame)
+- frames_con_actividad: COUNT(DISTINCT frame_numero)
+- confianza_promedio: AVG(confianza)
+- area_zona: ancho_norm * alto_norm (de la tabla ZONAS)
+- densidad_por_area: total_detecciones / area_zona
+- indice_valor_relativo: total_zona / (total_video / num_zonas)
+
+El índice de valor relativo es la métrica principal para pricing.
+Zona con índice 2.5x → cobrar 2.5x el precio base del recinto.
+
+## Justificación del modelo de negocio (contexto para implementación)
+
+Las métricas miden "exposición comercial ponderada por tiempo". 
+Cada detección = 1 instante de presencia humana en la zona.
+Al muestrear a 1 fps, acumulamos "persona-segundos" por zona.
+Esta es la unidad estándar de valor en retail y publicidad (OTS).
+Los endpoints deben exponer estas métricas de forma que el frontend 
+las pueda traducir directamente a decisiones de pricing.

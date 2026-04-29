@@ -295,3 +295,55 @@ GROUP BY d.id_video, d.id_zona;
 - **No** relajar las constraints de FK "por conveniencia". Si hay que borrar datos, usar cascada explícita.
 - **No** almacenar secretos (JWT secret, passwords de email) en la BD. Eso va en variables de entorno.
 - **No** cambiar el esquema sin actualizar primero `ALCANCE_COMPLETO.md` sección 5.
+
+## Cambios al esquema por el editor de zonas
+
+### Modificaciones a tabla VIDEOS
+
+Nuevos campos:
+  ruta_frame_preview VARCHAR(512) NULL  ← ruta del PNG extraído
+  estado ENUM actualizado: 
+    'PENDIENTE','FRAME_LISTO','ESPERANDO_ZONAS','PROCESANDO','COMPLETADO','ERROR'
+
+### Modificaciones a tabla ZONAS
+
+Nuevos campos:
+  nombre       VARCHAR(100) NOT NULL    ← "Local A", "Pasillo", etc.
+  color_hex    VARCHAR(7) NULL          ← "#FF5733" para visualización
+
+### Modificaciones a tabla METRICAS
+
+Nuevas columnas:
+  area_zona              DECIMAL(8,6)  ← ancho_norm * alto_norm
+  densidad_por_area      DECIMAL(8,3)  ← detecciones / area_zona  
+  indice_valor_relativo  DECIMAL(5,2)  ← normalizado al promedio del recinto
+  frames_con_actividad   INT           ← frames con >=1 detección en la zona
+
+### Nueva tabla METRICAS_HORARIAS
+
+Para análisis temporal por franjas dentro del video:
+
+CREATE TABLE metricas_horarias (
+  id                BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_video          BIGINT NOT NULL,
+  id_zona           BIGINT NOT NULL,
+  minuto_inicio     INT NOT NULL,     ← minuto del video donde inicia la franja
+  minuto_fin        INT NOT NULL,     ← minuto del video donde termina
+  total_detecciones INT NOT NULL DEFAULT 0,
+  densidad_relativa DECIMAL(6,3),
+  CONSTRAINT fk_mh_video FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mh_zona  FOREIGN KEY (id_zona)  REFERENCES zonas(id)  ON DELETE RESTRICT,
+  INDEX idx_mh_video_zona (id_video, id_zona)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+Esta tabla habilita el dashboard "Matriz zona × franja horaria".
+
+## Justificación de no tener id_persona ni tracking
+
+La tabla DETECCIONES no tiene campo id_persona por diseño deliberado:
+- No hacemos tracking entre frames (yolo no lo hace en nuestro pipeline)
+- Identificar personas individuales requiere biometría (ilegal Ley 21.719)
+- La métrica de "persona-segundos" es suficiente para pricing comercial
+- Agregar tracking aumenta complejidad sin aportar valor al caso de uso
+
+Esta decisión es permanente para el MVP y cualquier versión futura.
