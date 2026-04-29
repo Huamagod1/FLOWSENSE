@@ -165,3 +165,52 @@ Los siguientes archivos en la raíz del repo son de pruebas previas y **no forma
 - `main.py`, `tracker.py`, `coco.txt`, `yolov8s.pt`, `video.zip`, `__pycache__/`
 
 El código oficial vive exclusivamente dentro de `/Producto/*`.
+
+## Decisión de versión Python
+
+El proyecto usa Python 3.12 (no 3.11 como se indicó originalmente). 
+Razón: compatibilidad con wheels precompilados de numpy 1.26 y ultralytics 
+8.3.x. Python 3.13+ causa problemas de compilación con estas dependencias.
+Todo el equipo debe usar Python 3.12 en todos los equipos de desarrollo.
+
+## Modelos YOLOv8 soportados
+
+El sistema soporta tres modelos intercambiables via CLI (--modelo):
+
+| Modelo | Tamaño | Velocidad CPU | Precisión | Cuándo usar |
+|--------|--------|---------------|-----------|-------------|
+| yolov8n | 6 MB | ~0.6s/frame | Base | Pruebas, demos rápidos |
+| yolov8s | 22 MB | ~1.5s/frame | Media | Recintos típicos (default recomendado) |
+| yolov8m | 52 MB | ~3.5s/frame | Alta | Escenas densas (ferias, malls llenos) |
+
+Default actual: yolov8n (por backward compatibility). 
+Recomendado para producción: yolov8s o yolov8m.
+
+## Fundamento conceptual del producto
+
+FlowSense mide "exposición comercial ponderada por tiempo". Cada 
+detección en el CSV representa un instante de presencia humana en una 
+zona. Al muestrear a 1 fps, cada detección equivale a 1 segundo de 
+presencia. La acumulación de detecciones por zona es equivalente a 
+"persona-segundos", la unidad de exposición comercial.
+
+Esta métrica es estándar en el retail y la publicidad exterior (OTS: 
+Opportunity To See). No distingue entre atención activa y pasiva porque:
+1. La exposición periférica tiene valor comercial demostrado
+2. La presencia física genera prueba social (atrae a otros)
+3. A escala, la distribución de intenciones es proporcional entre zonas
+4. Medir intenciones individuales requeriría biometría (ilegal en Chile)
+
+## Flujo del editor de zonas
+
+El flujo correcto de análisis incluye un paso de definición de zonas 
+ANTES del procesamiento del video:
+
+1. Admin sube MP4 → estado PENDIENTE
+2. Python extrae frame representativo (segundo 5) → estado FRAME_LISTO
+3. Admin ve el frame, dibuja rectángulos sobre él → estado ESPERANDO_ZONAS
+4. Admin guarda zonas y lanza análisis → estado PROCESANDO
+5. Python detecta con esas zonas → estado COMPLETADO
+
+Las zonas se dibujan sobre el frame del video (no un plano abstracto) 
+para que las coordenadas sean directamente aplicables.
