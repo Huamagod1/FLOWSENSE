@@ -68,6 +68,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ProcesamientoException.class)
+    public ResponseEntity<ApiErrorResponse> handleProcesamiento(ProcesamientoException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApiErrorResponse.builder()
+                        .error("ERROR_PROCESAMIENTO")
+                        .mensaje(ex.getMessage())
+                        .build()
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGenerico(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
