@@ -37,3 +37,13 @@ zonas_prueba.json
 
 # Salidas locales
 *.log
+
+# Resultados de pruebas locales Python
+Producto/python/resultado*.csv
+Producto/python/zonas_*.json
+zonas_prueba.json
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
