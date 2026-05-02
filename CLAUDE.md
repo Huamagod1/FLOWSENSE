@@ -13,7 +13,7 @@ El producto es **offline por diseño**: no analiza video en tiempo real ni requi
 | Capa | Tecnología | Deploy |
 |---|---|---|
 | Frontend | React 18 + Vite + react-router-dom 6 | Vercel |
-| Backend | Spring Boot 3 + Java 17 + Spring Security + JWT | Railway |
+| Backend | Spring Boot 3 + Java 21 + Spring Security + JWT | Railway |
 | Visión IA | Python 3.11 + YOLOv8n (ultralytics) + OpenCV | Proceso invocado desde Spring Boot vía ProcessBuilder |
 | Base de datos | MySQL 8 | Railway (plugin) |
 | Email | Spring Mail con Gmail SMTP o Mailtrap | Dev/Prod |
