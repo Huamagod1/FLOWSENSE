@@ -18,6 +18,8 @@ public class VideoResponse {
     private Integer duracionSegundos;
     private Integer anchoFrame;
     private Integer altoFrame;
+    private Integer framesProcesados;
+    private Integer deteccionesTotales;
     private EstadoVideo estado;
     private String mensajeError;
     private LocalDateTime fechaSubida;
@@ -32,6 +34,8 @@ public class VideoResponse {
                 .duracionSegundos(video.getDuracionSegundos())
                 .anchoFrame(video.getAnchoFrame())
                 .altoFrame(video.getAltoFrame())
+                .framesProcesados(video.getFramesProcesados())
+                .deteccionesTotales(video.getDeteccionesTotales())
                 .estado(video.getEstado())
                 .mensajeError(video.getMensajeError())
                 .fechaSubida(video.getFechaSubida())

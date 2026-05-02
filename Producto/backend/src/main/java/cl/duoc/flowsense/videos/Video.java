@@ -46,6 +46,12 @@ public class Video {
     @Column(name = "alto_frame")
     private Integer altoFrame;
 
+    @Column(name = "frames_procesados")
+    private Integer framesProcesados;
+
+    @Column(name = "detecciones_totales")
+    private Integer deteccionesTotales;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
