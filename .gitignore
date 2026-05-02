@@ -28,3 +28,12 @@ venv/
 # IDE local
 .idea/
 .vscode/settings.json
+
+# Archivos de prueba de Python (no deben versionarse)
+Producto/python/resultado*.csv
+Producto/python/zonas_*.json
+Producto/python/tests/__pycache__/
+zonas_prueba.json
+
+# Salidas locales
+*.log
