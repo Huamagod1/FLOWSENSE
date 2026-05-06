@@ -42,6 +42,7 @@ zonas_prueba.json
 Producto/python/resultado*.csv
 Producto/python/zonas_*.json
 zonas_prueba.json
+Producto/python/*.csv
 
 # Caché de Python
 __pycache__/
