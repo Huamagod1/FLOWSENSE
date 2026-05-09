@@ -1,297 +1,306 @@
 # CLAUDE.md — Capa Backend / Spring Boot
 
-Este archivo da contexto específico de la API REST de FlowSense. Complementa el `CLAUDE.md` raíz. Lee ambos. La lista completa de endpoints está en `ALCANCE_COMPLETO.md`.
+Este archivo da contexto específico de la API REST de FlowSense. Complementa el `CLAUDE.md` raíz.
 
-## Rol de este módulo
+## Rol del módulo
 
-API REST en Spring Boot 3 con Java 17 que orquesta todo el sistema. Recibe requests del frontend React, gestiona autenticación con JWT, invoca el script Python para procesar videos, lee el CSV resultante, calcula métricas agregadas, y persiste todo en MySQL.
+API REST en Spring Boot 3 que orquesta el sistema completo. Recibe requests de React, gestiona autenticación con JWT, invoca Python para procesamiento de video, lee CSV resultantes, calcula métricas avanzadas y persiste todo en MySQL.
 
 ## Stack del módulo
 
-- Spring Boot 3.2+ con Spring Web, Spring Data JPA, Spring Security, Spring Mail, Spring Validation
+- Spring Boot 3.2+
 - Java 17 (LTS)
+- Spring Security + JWT (jjwt 0.12.x)
+- Spring Data JPA
+- Spring Validation
+- Spring Mail (post-MVP)
 - MySQL Connector/J 8.x
-- JJWT (io.jsonwebtoken) 0.12.x para firma y validación de JWT
-- BCrypt (incluido en Spring Security)
 - Maven como build tool
+- Flyway para migraciones de BD
 
-## Estructura del módulo
+## Arquitectura de paquetes
 
 ```
-Producto/backend/
-├── CLAUDE.md
-├── README.md
-├── pom.xml
-├── Dockerfile
-├── src/main/java/cl/duoc/flowsense/
-│   ├── FlowsenseApplication.java
-│   ├── config/
-│   │   ├── SecurityConfig.java          ← filtro JWT, CORS, cadena de seguridad
-│   │   ├── JwtConfig.java
-│   │   └── MailConfig.java
-│   ├── auth/
-│   │   ├── AuthController.java          ← /api/auth/**
-│   │   ├── AuthService.java
-│   │   ├── JwtService.java              ← generación y validación de tokens
-│   │   ├── JwtAuthFilter.java           ← filtro de cada request
-│   │   └── dto/                         ← LoginRequest, RegistroRequest, etc.
-│   ├── usuarios/
-│   │   ├── UsuarioController.java
-│   │   ├── UsuarioService.java
-│   │   ├── UsuarioRepository.java
-│   │   ├── Usuario.java                 ← entidad JPA
-│   │   └── dto/
-│   ├── organizaciones/
-│   │   ├── OrganizacionController.java
-│   │   ├── OrganizacionService.java
-│   │   ├── OrganizacionRepository.java
-│   │   ├── Organizacion.java
-│   │   ├── InvitacionService.java
-│   │   └── dto/
-│   ├── recintos/
-│   │   ├── RecintoController.java
-│   │   ├── RecintoService.java
-│   │   ├── RecintoRepository.java
-│   │   ├── Recinto.java
-│   │   ├── ZonaController.java
-│   │   ├── ZonaService.java
-│   │   ├── Zona.java
-│   │   └── dto/
-│   ├── videos/
-│   │   ├── VideoController.java
-│   │   ├── VideoService.java
-│   │   ├── VideoRepository.java
-│   │   ├── Video.java
-│   │   ├── DeteccionRepository.java
-│   │   ├── Deteccion.java
-│   │   ├── MetricaRepository.java
-│   │   ├── Metrica.java
-│   │   └── dto/
-│   ├── procesamiento/
-│   │   ├── PythonOrchestratorService.java   ← ProcessBuilder + async
-│   │   ├── CsvParserService.java
-│   │   └── MetricasCalculatorService.java
-│   ├── email/
-│   │   ├── EmailService.java
-│   │   └── templates/                    ← HTMLs de reset e invitación
-│   ├── common/
-│   │   ├── exceptions/                   ← handlers globales
-│   │   ├── security/                     ← utilidades (CurrentUser, etc.)
-│   │   └── validation/
-│   └── tokens/
-│       ├── TokenAuth.java
-│       ├── TokenAuthRepository.java
-│       └── TokenAuthService.java
-├── src/main/resources/
-│   ├── application.yml
-│   ├── application-dev.yml
-│   ├── application-prod.yml
-│   └── db/migration/                     ← Flyway SQL
-└── src/test/java/...
+src/main/java/cl/duocuc/flowsense/backend/
+├── BackendApplication.java
+├── config/
+│   ├── SecurityConfig.java
+│   ├── JwtConfig.java
+│   └── CorsConfig.java
+├── auth/
+│   ├── AuthController.java          ← /api/auth/**
+│   ├── AuthService.java
+│   ├── JwtService.java
+│   ├── JwtAuthFilter.java
+│   └── dto/
+├── usuarios/
+│   ├── Usuario.java                 ← entidad JPA
+│   ├── UsuarioRepository.java
+│   ├── UsuarioService.java
+│   └── UsuarioController.java
+├── recintos/
+│   ├── Recinto.java
+│   ├── RecintoRepository.java
+│   ├── RecintoService.java
+│   └── RecintoController.java
+├── videos/
+│   ├── Video.java
+│   ├── VideoRepository.java
+│   ├── VideoService.java
+│   ├── VideoController.java
+│   └── EstadoVideo.java             ← enum de estados
+├── zonas/
+│   ├── Zona.java
+│   ├── ZonaRepository.java
+│   ├── ZonaService.java
+│   └── ZonaController.java
+├── deteccion/
+│   ├── Deteccion.java
+│   ├── DeteccionRepository.java
+│   └── CsvImportService.java        ← lee CSV de Python
+├── metricas/
+│   ├── MetricaZona.java
+│   ├── MetricaTemporal.java
+│   ├── MetricaRepository.java
+│   ├── MetricaController.java
+│   └── CalculadoraMetricasService.java
+├── procesamiento/
+│   ├── PipelineService.java         ← orquestación general
+│   ├── PythonExecutor.java          ← ProcessBuilder wrapper
+│   └── EstadoVideoListener.java     ← maneja transiciones de estado
+└── common/
+    ├── exceptions/
+    ├── security/
+    └── validation/
 ```
 
-## Contratos clave
+## Estados del Video (críticos)
 
-### Contrato con Python (ProcessBuilder)
+```
+PENDIENTE → FRAME_LISTO → ESPERANDO_ZONAS → PROCESANDO → COMPLETADO | ERROR
+```
 
-- **Invocación**: Spring ejecuta `python detector.py --video <path> --output <path> --zonas <path> --fps 1 --conf <umbral>`.
-- **Asíncrono**: el endpoint de upload responde `201 Created` con `{video_id}` inmediatamente. El procesamiento se ejecuta en un `@Async` o `CompletableFuture.runAsync()`.
-- **Estados del video** (en tabla `VIDEOS`): `PENDIENTE` → `PROCESANDO` → `COMPLETADO` | `ERROR`.
-- **Captura de stdout**: Spring lee la última línea del stdout como JSON con `{frames_procesados, detecciones_totales, duracion_seg, status}`. Si `status="ERROR"` o exit code ≠ 0, se marca el video como `ERROR` con el mensaje guardado en un campo `mensaje_error`.
-- **Timeout**: 10 minutos. Si Python no termina, matar proceso y marcar `ERROR`.
+| Estado | Significado | Próximo paso |
+|--------|-------------|--------------|
+| PENDIENTE | Video subido, sin procesar | Lanzar extracción de frame |
+| FRAME_LISTO | Frame extraído, listo para definir zonas | Frontend muestra editor |
+| ESPERANDO_ZONAS | Admin está dibujando zonas | Esperar confirmación |
+| PROCESANDO | Detección en curso | Polling cada 3 seg |
+| COMPLETADO | Métricas calculadas | Mostrar dashboard |
+| ERROR | Falló algún paso | Mostrar mensaje, permitir reintento |
 
-### Contrato con Frontend
+## Flujo de orquestación con Python
 
-- Todas las respuestas son JSON.
-- Errores con estructura uniforme: `{"error": "codigo", "mensaje": "texto", "detalles": {...}}`.
-- Todos los endpoints autenticados esperan `Authorization: Bearer <token>` en header.
-- Todos los endpoints autenticados filtran automáticamente por `id_organizacion` del usuario logueado. Un usuario **nunca** ve recintos, videos ni datos de otra organización.
+### Fase 1: Extracción de frame (al subir video)
+
+1. Endpoint `POST /api/recintos/:id/videos` recibe MP4
+2. Spring Boot guarda MP4 en disco (UPLOAD_DIR)
+3. Crea registro VIDEOS con estado=PENDIENTE
+4. Invoca async: `python detector.py --modo extraer-frame --video <ruta> --frame-output <ruta_png>`
+5. Lee resultado JSON de stdout
+6. Actualiza VIDEOS: `ruta_frame_preview = <ruta_png>`, `estado = FRAME_LISTO`
+7. Responde al frontend con video_id (response 201)
+
+### Fase 2: Detección completa (al guardar zonas)
+
+1. Endpoint `POST /api/videos/:id/zonas/confirmar` confirma las zonas
+2. Spring Boot exporta zonas a JSON: `<zones_dir>/<uuid>.json`
+3. Actualiza estado=PROCESANDO
+4. Invoca async: `python detector.py --modo detectar --video <mp4> --output <csv> --zonas <json> ...`
+5. Espera con timeout de 30 minutos
+6. Lee CSV resultante
+7. Inserta en DETECCIONES (batch)
+8. Calcula métricas avanzadas (ver sección siguiente)
+9. Inserta en METRICAS_ZONA y METRICAS_TEMPORALES
+10. Actualiza estado=COMPLETADO
+
+### ProcessBuilder
+
+```java
+ProcessBuilder pb = new ProcessBuilder(
+    pythonBin,
+    pythonScript,
+    "--modo", modo,
+    "--video", videoPath,
+    // ... otros argumentos
+);
+pb.redirectErrorStream(false); // mantener stderr separado
+Process p = pb.start();
+```
+
+Capturar stdout (JSON resumen) y stderr (logs/errores). Timeout configurable.
+
+## Cálculo de métricas avanzadas
+
+Después de insertar las detecciones del CSV, calcular las 4 métricas en SQL.
+
+### Tráfico relativo
+
+```sql
+INSERT INTO metricas_zona (id_video, id_zona, total_detecciones, indice_trafico, ...)
+SELECT 
+    d.id_video,
+    d.id_zona,
+    COUNT(*) AS total_detecciones,
+    COUNT(*) / (
+        (SELECT COUNT(*) FROM detecciones WHERE id_video = ?) / 
+        (SELECT COUNT(*) FROM zonas WHERE id_video = ?)
+    ) AS indice_trafico,
+    -- ...
+FROM detecciones d
+WHERE d.id_video = ?
+GROUP BY d.id_video, d.id_zona;
+```
+
+### Tasa de detención
+
+```sql
+UPDATE metricas_zona mz
+SET tasa_detencion = (
+    SELECT SUM(CASE WHEN d.detenida THEN 1 ELSE 0 END) * 1.0 / COUNT(*)
+    FROM detecciones d
+    WHERE d.id_video = mz.id_video AND d.id_zona = mz.id_zona
+)
+WHERE mz.id_video = ?;
+```
+
+### Patrón temporal
+
+```sql
+INSERT INTO metricas_temporales (id_video, id_zona, franja_numero, ...)
+SELECT 
+    d.id_video,
+    d.id_zona,
+    FLOOR(d.frame_numero / (max_frame / 5)) AS franja,  -- 5 franjas
+    COUNT(*) AS total
+FROM detecciones d
+WHERE d.id_video = ?
+GROUP BY d.id_video, d.id_zona, franja;
+```
+
+### Score compuesto
+
+```sql
+UPDATE metricas_zona mz
+SET score_compuesto = (
+    0.40 * mz.indice_trafico +
+    0.30 * mz.tasa_detencion +
+    0.20 * (mz.densidad_promedio / promedio_densidad_recinto) +
+    0.10 * mz.consistencia_temporal
+)
+WHERE mz.id_video = ?;
+```
+
+## Endpoints completos del MVP
+
+### Autenticación
+
+| Método | Endpoint | Body | Respuesta |
+|--------|----------|------|-----------|
+| POST | `/api/auth/registro` | email, password, nombre, apellido | token, usuario |
+| POST | `/api/auth/login` | email, password | token, usuario |
+
+### Recintos
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/recintos` | Lista recintos del usuario |
+| POST | `/api/recintos` | Crear recinto |
+| GET | `/api/recintos/:id` | Detalle |
+| PUT | `/api/recintos/:id` | Editar |
+| DELETE | `/api/recintos/:id` | Eliminar |
+
+### Videos
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/recintos/:id/videos` | Upload MP4 (multipart/form-data) |
+| GET | `/api/videos/:id/estado` | Polling de estado |
+| GET | `/api/videos/:id/frame-preview` | URL del PNG extraído |
+| GET | `/api/recintos/:id/videos` | Historial |
+| DELETE | `/api/videos/:id` | Eliminar |
+
+### Zonas
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/videos/:id/zonas` | Listar zonas |
+| PUT | `/api/videos/:id/zonas` | Guardar zonas (batch) |
+| POST | `/api/videos/:id/zonas/confirmar` | Confirmar y lanzar detección |
+
+### Métricas
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/videos/:id/metricas` | Métricas por zona |
+| GET | `/api/videos/:id/metricas-temporales` | Patrón temporal |
+| GET | `/api/videos/:id/detecciones` | Puntos para heatmap |
+| POST | `/api/videos/:id/precio-sugerido` | Calcular precios con base |
 
 ## JWT y autenticación
 
 ### Configuración
 
-- **Algoritmo**: HS256.
-- **Secret**: `JWT_SECRET` env var, mínimo 256 bits (32 caracteres).
-- **Expiración**: 24 horas.
-- **Payload**:
-  ```json
-  {
-    "sub": "<id_usuario>",
-    "email": "<email>",
-    "org_id": "<id_organizacion>",
-    "rol": "ADMIN",
-    "iat": <timestamp>,
-    "exp": <timestamp>
-  }
-  ```
+- Algoritmo: HS256
+- Secret: variable de entorno `JWT_SECRET` (mínimo 256 bits = 32 caracteres)
+- Expiración: 24 horas
+- Payload: `sub` (id_usuario), `email`, `iat`, `exp`
 
-### Filtro JWT
+### JwtAuthFilter
 
-`JwtAuthFilter extends OncePerRequestFilter` aplicado a todas las rutas `/api/**` **excepto** `/api/auth/**`. El filtro:
-1. Lee `Authorization` header.
-2. Valida firma y expiración.
-3. Carga el `Usuario` desde el claim `sub`.
-4. Setea `SecurityContextHolder` con las authorities (`ROLE_ADMIN`).
-5. Si el token es inválido → responde 401 con JSON de error (no redirect).
+`OncePerRequestFilter` aplicado a `/api/**` excepto `/api/auth/**`. Si el token es inválido → 401 con JSON estructurado, no redirect.
 
-### Contraseñas
+### Aislamiento de datos
 
-- BCrypt strength 10.
-- Validación al registrar: mínimo 8 caracteres, al menos una letra y un número.
-- Nunca retornar el `password_hash` en ningún DTO.
+Regla crítica: todos los recursos pertenecen a un usuario vía `RECINTOS.id_usuario`. En cada query filtrar por usuario logueado. Si un admin intenta acceder a recurso de otro → 404 (no 403, para no revelar existencia).
 
-## Multi-tenancy por organización
+Patrón: inyectar `CurrentUser` que expone `getId()` y filtrar siempre con `findByIdAndUsuarioId(id, currentUser.getId())`.
 
-**Regla crítica**: todo recurso (recinto, video, zona, detección, métrica) pertenece a una organización vía `RECINTOS.id_organizacion`. En cada query se filtra por la organización del usuario logueado.
+## Procesamiento asíncrono
 
-Patrón recomendado: un `CurrentUser` injectable que expone `getIdOrganizacion()`, y en todos los repositorios métodos con `findByIdAndOrganizacionId(Long id, Long orgId)` en lugar de `findById(Long id)`.
-
-Si un admin intenta acceder a un recurso de otra organización → `404 Not Found` (no `403`, para no filtrar la existencia).
-
-## Invitaciones entre admins
-
-Flujo completo:
-
-1. Admin A logueado → `POST /api/organizacion/invitaciones` con `{email_destino}`.
-2. Backend valida que el email no sea ya usuario de otra org (si lo es → 409).
-3. Genera token random en `TOKENS_AUTH` con `tipo='INVITACION_ORG'`, `id_organizacion=A.id_organizacion`, `email_destino`, expira en 24h.
-4. Envía email con link `https://<frontend>/invitacion/<token>`.
-5. Usuario destino abre el link, completa `nombre, apellido, password` → `POST /api/auth/invitacion/:token`.
-6. Backend valida token (existe, no usado, no expirado), crea `Usuario` con `id_organizacion` del token, marca token como `usado=true`, retorna JWT.
-
-## Recuperación de contraseña (HU-14, Sprint 4)
-
-Flujo similar:
-
-1. `POST /api/auth/recuperar` con `{email}`.
-2. **Siempre** responde 200 con mensaje genérico (por seguridad, no revelar si el email existe).
-3. Si el email existe, genera token con `tipo='PASSWORD_RESET'`, expira en 24h, envía email.
-4. Usuario abre link `https://<frontend>/recuperar/<token>` → `POST /api/auth/recuperar/:token` con `{nueva_password}`.
-5. Backend valida token, actualiza `password_hash`, marca token como usado.
-
-## Procesamiento asíncrono de videos
-
-Opciones en orden de preferencia:
-
-**Opción 1 — `@Async` con ThreadPoolTaskExecutor** (recomendada para MVP):
-- Simple, sin infraestructura adicional.
-- Limitar pool a 2-3 threads para no saturar CPU con múltiples YOLO.
-- Riesgo: si Spring Boot se reinicia durante procesamiento, el video queda en `PROCESANDO` para siempre. Mitigación: al startup, buscar videos en `PROCESANDO` con `>10min` y marcar `ERROR`.
-
-**Opción 2 — Cola en BD con worker** (sobreingeniería para este MVP, no implementar salvo que lo pida el docente).
+Usar `@Async` con `ThreadPoolTaskExecutor`:
+- Pool de 2-3 threads (no saturar CPU con múltiples YOLO)
+- Si Spring Boot reinicia durante PROCESANDO, al startup buscar videos en ese estado con timestamp >10min y marcar ERROR
 
 ## Variables de entorno
 
 ```env
-# Base de datos
 DB_HOST=mysql
 DB_PORT=3306
 DB_NAME=flowsense
 DB_USER=flowsense
 DB_PASSWORD=<secret>
 
-# JWT
 JWT_SECRET=<64-char-random>
 JWT_EXPIRATION_HOURS=24
 
-# Email
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=<email>
-MAIL_PASSWORD=<app-password>
-MAIL_FROM=noreply@flowsense.cl
-
-# Python
 PYTHON_BIN=python3
 PYTHON_SCRIPT=/app/python/detector.py
 UPLOAD_DIR=/app/uploads
 RESULTS_DIR=/app/results
 ZONES_DIR=/app/zones
+FRAMES_DIR=/app/frames
 
-# App
 FRONTEND_URL=http://localhost:5173
 CORS_ALLOWED_ORIGINS=http://localhost:5173,https://<vercel-url>
 ```
 
-**Nunca** commitear `.env` con valores reales. Usar `.env.example` con valores dummy.
+Nunca commitear `.env` con valores reales. Usar `.env.example` con dummies.
 
 ## Convenciones de código
 
-- **Paquetes** por feature (auth, usuarios, recintos, videos), no por capa técnica (controllers, services, entities).
-- **DTOs obligatorios** en request y response de controllers. Nunca exponer entidades JPA directamente.
-- **Validaciones** con Bean Validation (`@NotNull`, `@Email`, `@Size`).
-- **Excepciones custom** (`RecursoNoEncontradoException`, `AccesoDenegadoException`, `ValidacionException`) manejadas por un `@ControllerAdvice` global.
-- **Logs** con SLF4J. Nivel INFO para eventos de negocio, DEBUG para detalles técnicos, ERROR solo para fallos reales.
-- **Tests** mínimos: unitarios de servicios críticos (auth, cálculo de métricas) con Mockito; integración del pipeline end-to-end opcional.
+- Paquetes por feature (auth, usuarios, recintos), no por capa técnica
+- DTOs obligatorios en request y response
+- Bean Validation (@NotNull, @Email, @Size)
+- Excepciones custom manejadas por @ControllerAdvice global
+- Logs con SLF4J: INFO para negocio, DEBUG para detalles, ERROR para fallos reales
+- Tests unitarios mínimos: AuthService, CalculadoraMetricasService
 
 ## Lo que Claude Code NO debe hacer en este módulo
 
-- **No** exponer entidades JPA en endpoints (siempre DTOs).
-- **No** hardcodear el secret JWT, credenciales de email, ni URLs de frontend.
-- **No** olvidar filtrar por `id_organizacion` en queries que involucran recintos/videos/zonas.
-- **No** retornar mensajes de error que revelen si un email está registrado o no (en endpoints de auth).
-- **No** procesar video de forma sincrónica bloqueando el request HTTP.
-- **No** implementar roles adicionales más allá de ADMIN sin actualizar primero `ALCANCE_COMPLETO.md`.
-- **No** agregar campos a `DETECCIONES` o `METRICAS` que puedan permitir identificación individual de personas.
-
-## Flujo de orquestación con editor de zonas
-
-El flujo de procesamiento tiene 2 fases de invocación a Python:
-
-Fase 1 — Extracción de frame (al subir el video):
-ProcessBuilder invoca: python detector.py --modo extraer-frame 
-                       --video <ruta> --frame-output <ruta.png>
-Duración: ~2-3 segundos
-Resultado: imagen PNG guardada, estado del video → FRAME_LISTO
-
-Fase 2 — Detección completa (cuando el admin guarda las zonas):
-ProcessBuilder invoca: python detector.py --video ... --zonas ... 
-                       --conf ... --modelo ...
-Duración: proporcional al video (~1-2 min por minuto de video)
-Resultado: CSV con detecciones, métricas calculadas, estado → COMPLETADO
-
-Nunca lanzar Fase 2 sin que las zonas estén guardadas en BD.
-
-## Estados del video (actualizados)
-
-PENDIENTE → FRAME_LISTO → ESPERANDO_ZONAS → PROCESANDO → COMPLETADO | ERROR
-
-FRAME_LISTO: el frame representativo fue extraído exitosamente
-ESPERANDO_ZONAS: el admin abrió el editor pero no ha guardado aún
-(el sistema no avanza a PROCESANDO hasta que el admin confirme)
-
-## Nuevo endpoint: extraer frame preview
-
-GET /api/videos/{id}/frame-preview
-- Verifica que el video existe y pertenece a la organización
-- Invoca Python en modo extraer-frame si no existe ya el PNG
-- Devuelve: {"url_frame": "/frames/{uuid}.png", "ancho": 1920, "alto": 1080}
-- El ancho y alto del frame son necesarios para que el frontend 
-  calcule correctamente las coordenadas normalizadas
-
-## Cálculo de métricas expandido
-
-Spring Boot calcula estas métricas por cada zona al completar el análisis:
-
-- total_detecciones: COUNT de filas de la zona
-- porcentaje_del_total: total_zona / total_video * 100  
-- densidad_promedio: total_zona / frames_procesados
-- pico_maximo: MAX(detecciones en un mismo frame)
-- frames_con_actividad: COUNT(DISTINCT frame_numero)
-- confianza_promedio: AVG(confianza)
-- area_zona: ancho_norm * alto_norm (de la tabla ZONAS)
-- densidad_por_area: total_detecciones / area_zona
-- indice_valor_relativo: total_zona / (total_video / num_zonas)
-
-El índice de valor relativo es la métrica principal para pricing.
-Zona con índice 2.5x → cobrar 2.5x el precio base del recinto.
-
-## Justificación del modelo de negocio (contexto para implementación)
-
-Las métricas miden "exposición comercial ponderada por tiempo". 
-Cada detección = 1 instante de presencia humana en la zona.
-Al muestrear a 1 fps, acumulamos "persona-segundos" por zona.
-Esta es la unidad estándar de valor en retail y publicidad (OTS).
-Los endpoints deben exponer estas métricas de forma que el frontend 
-las pueda traducir directamente a decisiones de pricing.
+- No exponer entidades JPA en endpoints (siempre DTOs)
+- No hardcodear secrets, credenciales, URLs
+- No olvidar filtrar por usuario logueado en queries
+- No procesar video sincrónicamente bloqueando HTTP
+- No agregar campos a DETECCIONES o METRICAS que permitan identificar personas
+- No implementar funcionalidades del ROADMAP_POST_MVP sin actualizar primero el alcance

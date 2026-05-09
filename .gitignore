@@ -28,3 +28,14 @@ venv/
 # IDE local
 .idea/
 .vscode/settings.json
+
+
+# Claude Code local config
+.claude/
+
+# Archivos de prueba local del detector Python
+Producto/python/resultado*.csv
+Producto/python/zonas_prueba*.json
+Producto/python/zonas_con_bom*.json
+zonas_prueba.json
+zonas_con_bom.json
