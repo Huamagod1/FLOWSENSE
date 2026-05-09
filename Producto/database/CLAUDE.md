@@ -1,17 +1,16 @@
 # CLAUDE.md — Capa Database / MySQL
 
-Este archivo da contexto específico del esquema de base de datos de FlowSense. Complementa el `CLAUDE.md` raíz. El MER completo está en `ALCANCE_COMPLETO.md` sección 5.
+Este archivo da contexto específico del esquema de base de datos. Complementa el `CLAUDE.md` raíz.
 
-## Rol de este módulo
+## Rol del módulo
 
-Esquema MySQL 8 que almacena toda la información persistente del sistema: organizaciones, usuarios, tokens de autenticación, recintos, zonas, videos analizados, detecciones anónimas y métricas agregadas. Las migraciones se manejan con Flyway desde el backend Spring Boot.
+Esquema MySQL 8 que almacena toda la información persistente del sistema. Las migraciones se manejan con Flyway desde Spring Boot.
 
 ## Stack del módulo
 
 - MySQL 8.x
-- Flyway como herramienta de migraciones (ejecutado por Spring Boot al arranque)
+- Flyway (ejecutado por Spring Boot al arranque)
 - MySQL Workbench para diseño del MER
-- Dockerizado vía `docker-compose.yml`
 
 ## Estructura del módulo
 
@@ -19,133 +18,75 @@ Esquema MySQL 8 que almacena toda la información persistente del sistema: organ
 Producto/database/
 ├── CLAUDE.md
 ├── README.md
-├── MER.png                          ← diagrama entidad-relación (EV-03)
+├── MER.png
 ├── MER.mwb                          ← fuente MySQL Workbench
+├── schema.sql                       ← schema completo de referencia
 ├── migrations/
-│   ├── V1__tablas_base.sql
-│   ├── V2__auth_tables.sql
-│   ├── V3__indices_rendimiento.sql
-│   └── ...
-├── seeds/
-│   ├── dev_seed.sql                 ← datos de prueba para desarrollo
-│   └── demo_seed.sql                ← datos para la demo del docente
-└── docs/
-    └── decisiones_esquema.md        ← justificaciones de tipos, índices, FKs
+│   ├── V1__usuarios_y_recintos.sql
+│   ├── V2__videos_y_zonas.sql
+│   ├── V3__detecciones.sql
+│   ├── V4__metricas_zona.sql
+│   ├── V5__metricas_temporales.sql
+│   └── V6__indices_rendimiento.sql
+└── seeds/
+    ├── dev_seed.sql                 ← datos para desarrollo
+    └── demo_seed.sql                ← datos para demo
 ```
 
-Las migraciones en `migrations/` son la fuente de verdad. Flyway las ejecuta en orden numérico.
-
-## Tablas del esquema (8 tablas)
-
-### ORGANIZACIONES
-
-```sql
-CREATE TABLE organizaciones (
-  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-  nombre          VARCHAR(100) NOT NULL,
-  fecha_creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  activo          BOOLEAN NOT NULL DEFAULT TRUE,
-  INDEX idx_org_activo (activo)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
+## Tablas del MVP (7 tablas)
 
 ### USUARIOS
 
 ```sql
 CREATE TABLE usuarios (
-  id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_organizacion  BIGINT NOT NULL,
-  email            VARCHAR(150) NOT NULL UNIQUE,
-  password_hash    VARCHAR(255) NOT NULL,
-  nombre           VARCHAR(100) NOT NULL,
-  apellido         VARCHAR(100) NOT NULL,
-  telefono         VARCHAR(20) NULL,
-  empresa          VARCHAR(150) NULL,
-  rol              ENUM('ADMIN') NOT NULL DEFAULT 'ADMIN',
-  activo           BOOLEAN NOT NULL DEFAULT TRUE,
-  fecha_registro   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ultimo_login     DATETIME NULL,
-  CONSTRAINT fk_usuarios_organizacion
-    FOREIGN KEY (id_organizacion) REFERENCES organizaciones(id)
-    ON DELETE RESTRICT,
-  INDEX idx_usuarios_email (email),
-  INDEX idx_usuarios_org (id_organizacion)
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  email           VARCHAR(150) NOT NULL UNIQUE,
+  password_hash   VARCHAR(255) NOT NULL,
+  nombre          VARCHAR(100) NOT NULL,
+  apellido        VARCHAR(100) NOT NULL,
+  fecha_registro  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ultimo_login    DATETIME NULL,
+  activo          BOOLEAN NOT NULL DEFAULT TRUE,
+  INDEX idx_usuarios_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-### TOKENS_AUTH
-
-```sql
-CREATE TABLE tokens_auth (
-  id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_usuario       BIGINT NULL,
-  email_destino    VARCHAR(150) NULL,
-  id_organizacion  BIGINT NULL,
-  token            VARCHAR(255) NOT NULL UNIQUE,
-  tipo             ENUM('PASSWORD_RESET','INVITACION_ORG') NOT NULL,
-  expira_en        DATETIME NOT NULL,
-  usado            BOOLEAN NOT NULL DEFAULT FALSE,
-  fecha_creacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_tokens_usuario
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tokens_organizacion
-    FOREIGN KEY (id_organizacion) REFERENCES organizaciones(id) ON DELETE CASCADE,
-  INDEX idx_tokens_token (token),
-  INDEX idx_tokens_expira (expira_en, usado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
+Sin tabla de organizaciones en MVP. Cada usuario tiene sus recintos directamente.
 
 ### RECINTOS
 
 ```sql
 CREATE TABLE recintos (
-  id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_organizacion       BIGINT NOT NULL,
-  nombre                VARCHAR(150) NOT NULL,
-  tipo                  ENUM('MALL','GALERIA','FERIA','OTRO') NOT NULL DEFAULT 'OTRO',
-  direccion             VARCHAR(255) NULL,
-  imagen_plano_base64   LONGTEXT NULL,
-  fecha_creacion        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_recintos_organizacion
-    FOREIGN KEY (id_organizacion) REFERENCES organizaciones(id) ON DELETE CASCADE,
-  INDEX idx_recintos_org (id_organizacion)
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario      BIGINT NOT NULL,
+  nombre          VARCHAR(150) NOT NULL,
+  tipo            ENUM('MALL','GALERIA','FERIA','OTRO') NOT NULL DEFAULT 'OTRO',
+  direccion       VARCHAR(255) NULL,
+  fecha_creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_recintos_usuario
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE,
+  INDEX idx_recintos_usuario (id_usuario)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
-
-### ZONAS
-
-```sql
-CREATE TABLE zonas (
-  id           BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_recinto   BIGINT NOT NULL,
-  nombre       VARCHAR(100) NOT NULL,
-  x            DECIMAL(6,4) NOT NULL,
-  y            DECIMAL(6,4) NOT NULL,
-  ancho        DECIMAL(6,4) NOT NULL,
-  alto         DECIMAL(6,4) NOT NULL,
-  CONSTRAINT fk_zonas_recinto
-    FOREIGN KEY (id_recinto) REFERENCES recintos(id) ON DELETE CASCADE,
-  INDEX idx_zonas_recinto (id_recinto)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
-
-Coordenadas `x, y, ancho, alto` en rango [0, 1] normalizadas respecto al plano.
 
 ### VIDEOS
 
 ```sql
 CREATE TABLE videos (
-  id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_recinto       BIGINT NOT NULL,
-  nombre_original  VARCHAR(255) NOT NULL,
-  ruta             VARCHAR(512) NOT NULL,
-  estado           ENUM('PENDIENTE','PROCESANDO','COMPLETADO','ERROR') NOT NULL DEFAULT 'PENDIENTE',
-  mensaje_error    TEXT NULL,
-  conf_usado       DECIMAL(3,2) NULL,
-  frames_procesados INT NULL,
-  duracion_proceso_seg INT NULL,
-  fecha_subida     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  fecha_completado DATETIME NULL,
+  id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_recinto            BIGINT NOT NULL,
+  nombre_original       VARCHAR(255) NOT NULL,
+  ruta                  VARCHAR(512) NOT NULL,
+  ruta_frame_preview    VARCHAR(512) NULL,
+  estado                ENUM('PENDIENTE','FRAME_LISTO','ESPERANDO_ZONAS','PROCESANDO','COMPLETADO','ERROR') 
+                        NOT NULL DEFAULT 'PENDIENTE',
+  mensaje_error         TEXT NULL,
+  conf_usado            DECIMAL(3,2) NULL,
+  modelo_usado          VARCHAR(20) NULL,
+  frames_procesados     INT NULL,
+  duracion_proceso_seg  INT NULL,
+  fecha_subida          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_completado      DATETIME NULL,
   CONSTRAINT fk_videos_recinto
     FOREIGN KEY (id_recinto) REFERENCES recintos(id) ON DELETE CASCADE,
   INDEX idx_videos_recinto_fecha (id_recinto, fecha_subida DESC),
@@ -153,41 +94,70 @@ CREATE TABLE videos (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
+### ZONAS
+
+```sql
+CREATE TABLE zonas (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_video      BIGINT NOT NULL,
+  nombre        VARCHAR(100) NOT NULL,
+  color_hex     VARCHAR(7) NOT NULL DEFAULT '#3498db',
+  x_norm        DECIMAL(6,4) NOT NULL,
+  y_norm        DECIMAL(6,4) NOT NULL,
+  ancho_norm    DECIMAL(6,4) NOT NULL,
+  alto_norm     DECIMAL(6,4) NOT NULL,
+  CONSTRAINT fk_zonas_video
+    FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
+  INDEX idx_zonas_video (id_video)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+Coordenadas normalizadas en rango [0, 1].
+
 ### DETECCIONES
 
 ```sql
 CREATE TABLE detecciones (
-  id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_video         BIGINT NOT NULL,
-  id_zona          BIGINT NOT NULL,
-  frame_numero     INT NOT NULL,
-  x_centro_norm    DECIMAL(6,4) NOT NULL,
-  y_centro_norm    DECIMAL(6,4) NOT NULL,
-  confianza        DECIMAL(4,3) NOT NULL,
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_video        BIGINT NOT NULL,
+  id_zona         BIGINT NOT NULL,
+  frame_numero    INT NOT NULL,
+  x_centro_norm   DECIMAL(6,4) NOT NULL,
+  y_centro_norm   DECIMAL(6,4) NOT NULL,
+  confianza       DECIMAL(4,3) NOT NULL,
+  detenida        BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT fk_detecciones_video
     FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
   CONSTRAINT fk_detecciones_zona
     FOREIGN KEY (id_zona) REFERENCES zonas(id) ON DELETE RESTRICT,
   INDEX idx_detecciones_video_zona (id_video, id_zona),
-  INDEX idx_detecciones_frame (id_video, frame_numero)
+  INDEX idx_detecciones_frame (id_video, frame_numero),
+  INDEX idx_detecciones_detenida (id_video, detenida)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-Esta tabla puede crecer rápido (un video de 15 min con buen tráfico puede tener 10.000+ filas). El índice `(id_video, id_zona)` es crítico para los agregados.
+Esta tabla puede crecer rápido (un video de 15 min puede generar 10.000+ filas). Los índices son críticos para los agregados.
 
-### METRICAS
+### METRICAS_ZONA
 
 ```sql
-CREATE TABLE metricas (
-  id                     BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_video               BIGINT NOT NULL,
-  id_zona                BIGINT NOT NULL,
-  total_detecciones      INT NOT NULL DEFAULT 0,
-  porcentaje_del_total   DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-  densidad_promedio      DECIMAL(6,3) NOT NULL DEFAULT 0.000,
-  pico_maximo            INT NOT NULL DEFAULT 0,
-  frames_con_actividad   INT NOT NULL DEFAULT 0,
-  confianza_promedio     DECIMAL(4,3) NOT NULL DEFAULT 0.000,
+CREATE TABLE metricas_zona (
+  id                       BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_video                 BIGINT NOT NULL,
+  id_zona                  BIGINT NOT NULL,
+  total_detecciones        INT NOT NULL DEFAULT 0,
+  porcentaje_del_total     DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  densidad_promedio        DECIMAL(6,3) NOT NULL DEFAULT 0.000,
+  pico_maximo              INT NOT NULL DEFAULT 0,
+  frames_con_actividad     INT NOT NULL DEFAULT 0,
+  confianza_promedio       DECIMAL(4,3) NOT NULL DEFAULT 0.000,
+  area_zona                DECIMAL(8,6) NOT NULL DEFAULT 0.000000,
+  densidad_por_area        DECIMAL(8,3) NOT NULL DEFAULT 0.000,
+  tasa_detencion           DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  indice_trafico           DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  consistencia_temporal    DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  score_compuesto          DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+  precio_sugerido          DECIMAL(12,2) NULL,
   CONSTRAINT fk_metricas_video
     FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
   CONSTRAINT fk_metricas_zona
@@ -197,42 +167,74 @@ CREATE TABLE metricas (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-Una fila por cada combinación (video, zona). Se insertan todas al finalizar el procesamiento del video.
+Una fila por cada combinación (video, zona). Se insertan al finalizar el procesamiento.
 
-## Reglas de integridad
+### METRICAS_TEMPORALES
 
-### Cascadas de borrado
+```sql
+CREATE TABLE metricas_temporales (
+  id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_video            BIGINT NOT NULL,
+  id_zona             BIGINT NOT NULL,
+  franja_numero       INT NOT NULL,
+  segundo_inicio      INT NOT NULL,
+  segundo_fin         INT NOT NULL,
+  total_detecciones   INT NOT NULL DEFAULT 0,
+  densidad_relativa   DECIMAL(6,3) NOT NULL DEFAULT 0.000,
+  CONSTRAINT fk_metricas_temp_video
+    FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_metricas_temp_zona
+    FOREIGN KEY (id_zona) REFERENCES zonas(id) ON DELETE RESTRICT,
+  UNIQUE KEY uk_metricas_temp (id_video, id_zona, franja_numero),
+  INDEX idx_metricas_temp_video_zona (id_video, id_zona)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-- Eliminar `ORGANIZACION` → borra sus `USUARIOS`, `RECINTOS` y todo lo descendiente.
-- Eliminar `USUARIO` → borra sus `TOKENS_AUTH` asociados. No borra recintos (pertenecen a la org).
-- Eliminar `RECINTO` → borra sus `ZONAS`, `VIDEOS`, `DETECCIONES` y `METRICAS`.
-- Eliminar `VIDEO` → borra sus `DETECCIONES` y `METRICAS`.
-- `ZONAS` con `RESTRICT`: no se puede borrar una zona que tenga detecciones asociadas, primero borrar el análisis.
+Habilita el dashboard "Matriz zona × franja temporal".
 
-### Aislamiento por organización
+## Reglas de integridad y cascadas
 
-La separación entre organizaciones NO se implementa con triggers en BD. Se implementa en la capa de servicio del backend (Spring Boot filtra por `id_organizacion` en cada query). La BD solo garantiza integridad referencial.
+```
+USUARIOS    (1) ──< (N) RECINTOS         (CASCADE)
+RECINTOS    (1) ──< (N) VIDEOS           (CASCADE)
+VIDEOS      (1) ──< (N) ZONAS            (CASCADE)
+VIDEOS      (1) ──< (N) DETECCIONES      (CASCADE)
+ZONAS       (1) ──< (N) DETECCIONES      (RESTRICT - no borrar zona con detecciones)
+VIDEOS      (1) ──< (N) METRICAS_ZONA    (CASCADE)
+ZONAS       (1) ──< (N) METRICAS_ZONA    (RESTRICT)
+VIDEOS      (1) ──< (N) METRICAS_TEMP    (CASCADE)
+ZONAS       (1) ──< (N) METRICAS_TEMP    (RESTRICT)
+```
+
+## Aislamiento por usuario
+
+NO se implementa con triggers en BD. Se implementa en la capa de servicio del backend (filtrar siempre por `id_usuario`). La BD solo garantiza integridad referencial.
 
 ## Índices críticos para rendimiento
 
 | Índice | Propósito |
-|---|---|
+|--------|-----------|
 | `usuarios.email` (UNIQUE) | Login rápido |
-| `tokens_auth.token` | Validación de tokens de reset/invitación |
-| `recintos.id_organizacion` | Listar recintos de una org |
+| `recintos.id_usuario` | Listar recintos del usuario |
 | `videos.id_recinto + fecha_subida DESC` | Historial cronológico |
-| `videos.estado` | Query de videos pendientes/en proceso al startup |
-| `detecciones.id_video + id_zona` | Cálculo de agregados por zona |
-| `metricas.id_video` | Dashboard del análisis |
+| `videos.estado` | Query de pendientes al startup |
+| `detecciones.id_video + id_zona` | Cálculo de agregados |
+| `detecciones.id_video + detenida` | Cálculo de tasa de detención |
+| `metricas_zona.id_video` | Dashboard del análisis |
+| `metricas_temporales.id_video + id_zona` | Matriz temporal |
 
 ## Cálculo de métricas (SQL de referencia)
 
-Después de insertar las detecciones, Spring Boot ejecuta este agregado para poblar `METRICAS`:
+### Inserción de detecciones desde CSV
+
+Spring Boot lee el CSV y hace un INSERT batch en `detecciones`. Idealmente con `INSERT INTO ... VALUES (?, ?, ...), (?, ?, ...)` agrupando 100-500 filas por query.
+
+### Cálculo de métricas básicas por zona
 
 ```sql
-INSERT INTO metricas (id_video, id_zona, total_detecciones, porcentaje_del_total,
-                      densidad_promedio, pico_maximo, frames_con_actividad,
-                      confianza_promedio)
+INSERT INTO metricas_zona (id_video, id_zona, total_detecciones, porcentaje_del_total,
+                           densidad_promedio, pico_maximo, frames_con_actividad,
+                           confianza_promedio, tasa_detencion)
 SELECT
   d.id_video,
   d.id_zona,
@@ -245,7 +247,8 @@ SELECT
     GROUP BY d2.frame_numero
   ) AS picos) AS pico_maximo,
   COUNT(DISTINCT d.frame_numero) AS frames_con_actividad,
-  ROUND(AVG(d.confianza), 3) AS confianza_promedio
+  ROUND(AVG(d.confianza), 3) AS confianza_promedio,
+  ROUND(SUM(CASE WHEN d.detenida THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS tasa_detencion
 FROM detecciones d
 JOIN videos v ON v.id = d.id_video
 CROSS JOIN (
@@ -255,95 +258,85 @@ WHERE d.id_video = ?
 GROUP BY d.id_video, d.id_zona;
 ```
 
+### Cálculo del índice de tráfico
+
+```sql
+UPDATE metricas_zona mz
+SET indice_trafico = mz.total_detecciones / (
+    (SELECT total_detecciones FROM (
+        SELECT AVG(total_detecciones) AS total_detecciones 
+        FROM metricas_zona 
+        WHERE id_video = mz.id_video
+    ) AS promedio)
+)
+WHERE mz.id_video = ?;
+```
+
+### Cálculo del score compuesto
+
+```sql
+UPDATE metricas_zona mz
+SET score_compuesto = (
+    0.40 * mz.indice_trafico +
+    0.30 * (mz.tasa_detencion / 100.0) +
+    0.20 * mz.densidad_normalizada +  -- requiere cálculo previo
+    0.10 * mz.consistencia_temporal
+)
+WHERE mz.id_video = ?;
+```
+
+### Cálculo de métricas temporales
+
+```sql
+INSERT INTO metricas_temporales (id_video, id_zona, franja_numero,
+                                 segundo_inicio, segundo_fin,
+                                 total_detecciones, densidad_relativa)
+SELECT
+    d.id_video,
+    d.id_zona,
+    FLOOR(d.frame_numero / (max_frame.frame / 5)) + 1 AS franja,
+    FLOOR(d.frame_numero / (max_frame.frame / 5)) * (max_frame.frame / 5) AS seg_inicio,
+    (FLOOR(d.frame_numero / (max_frame.frame / 5)) + 1) * (max_frame.frame / 5) AS seg_fin,
+    COUNT(*) AS total,
+    COUNT(*) / (max_frame.frame / 5.0) AS densidad
+FROM detecciones d
+CROSS JOIN (
+    SELECT MAX(frame_numero) + 1 AS frame FROM detecciones WHERE id_video = ?
+) AS max_frame
+WHERE d.id_video = ?
+GROUP BY d.id_video, d.id_zona, franja, seg_inicio, seg_fin;
+```
+
 ## Migraciones con Flyway
 
-- Archivos en `migrations/` con formato `V<numero>__<descripcion>.sql`.
-- **Nunca modificar una migración ya aplicada**. Si hay que cambiar algo, crear una nueva migración.
-- En dev, `spring.flyway.clean-on-validation-error=false` para no perder datos accidentalmente.
-- En prod, solo migraciones `V*` (versionadas), nunca `R*` (repeatable).
+- Archivos en `migrations/` con formato `V<numero>__<descripcion>.sql`
+- NUNCA modificar una migración aplicada. Si hay que cambiar algo, nueva migración.
+- En dev: `spring.flyway.clean-on-validation-error=false`
+- En prod: solo migraciones `V*` (versionadas), nunca `R*`
 
 ## Seeds de desarrollo
 
 `dev_seed.sql` crea:
-- 2 organizaciones de prueba
-- 3 usuarios por organización con contraseñas conocidas
-- 2 recintos por organización con planos dummy (base64 de un PNG pequeño)
-- 3 zonas por recinto
-- 1 video procesado con detecciones sintéticas
+- 2 usuarios de prueba con contraseñas conocidas
+- 2 recintos por usuario
+- 1 video por recinto en estado COMPLETADO con detecciones sintéticas
+- Métricas precalculadas para mostrar dashboard funcional
 
-Útil para que un desarrollador recién clona el repo pueda loguearse inmediatamente. **Nunca ejecutar seeds en producción**.
-
-## Backup y mantenimiento
-
-- En Railway: los backups son automáticos del servicio MySQL gestionado.
-- Para desarrollo local: `docker compose exec mysql mysqldump flowsense > backup.sql`.
-- Tabla `detecciones` puede crecer rápidamente. Si en producción pasa de 10 millones de filas, considerar archivado de videos antiguos (>6 meses) a una tabla `detecciones_archivo`.
+NUNCA ejecutar seeds en producción.
 
 ## Datos sensibles y ética
 
-- **Contraseñas**: solo como `BCrypt hash` en `usuarios.password_hash`. Nunca columnas en texto plano.
-- **Detecciones**: por diseño, una fila de `DETECCIONES` **no permite identificar a nadie**. Solo: `frame=342, zona=2, x=0.47, y=0.61, confianza=0.82`. Si alguien propone agregar un campo que pueda identificar (ej. "color_dominante", "altura_estimada", "edad_aproximada"), **rechazarlo** y escalar al equipo.
-- **Emails**: son datos personales en Chile. No se comparten entre organizaciones. Solo accesibles por admins de la misma org.
-- **Retención**: videos y análisis son propiedad de la org. Si una org se elimina, se borran en cascada (derecho al olvido Ley 21.719).
+- `password_hash`: solo BCrypt, nunca texto plano
+- `detecciones`: por diseño, una fila NO permite identificar a nadie. Si alguien propone agregar campos como "color_dominante", "altura_estimada", "edad" → RECHAZAR
+- Emails: datos personales en Chile (Ley 19.628). No compartibles entre usuarios
+- Retención: si un usuario se elimina, cascada total (derecho al olvido Ley 21.719)
 
-## Lo que Claude Code NO debe hacer en este módulo
+## Lo que Claude Code NO debe hacer
 
-- **No** modificar migraciones ya aplicadas. Siempre crear una nueva.
-- **No** agregar columnas a `DETECCIONES` que permitan identificar personas (caras, ropa, altura, edad, género).
-- **No** crear índices sobre columnas que no se filtran ni ordenan; agregar índices tiene costo en escritura.
-- **No** usar `VARCHAR` sin límite razonable o `TEXT` cuando `VARCHAR(n)` basta.
-- **No** relajar las constraints de FK "por conveniencia". Si hay que borrar datos, usar cascada explícita.
-- **No** almacenar secretos (JWT secret, passwords de email) en la BD. Eso va en variables de entorno.
-- **No** cambiar el esquema sin actualizar primero `ALCANCE_COMPLETO.md` sección 5.
-
-## Cambios al esquema por el editor de zonas
-
-### Modificaciones a tabla VIDEOS
-
-Nuevos campos:
-  ruta_frame_preview VARCHAR(512) NULL  ← ruta del PNG extraído
-  estado ENUM actualizado: 
-    'PENDIENTE','FRAME_LISTO','ESPERANDO_ZONAS','PROCESANDO','COMPLETADO','ERROR'
-
-### Modificaciones a tabla ZONAS
-
-Nuevos campos:
-  nombre       VARCHAR(100) NOT NULL    ← "Local A", "Pasillo", etc.
-  color_hex    VARCHAR(7) NULL          ← "#FF5733" para visualización
-
-### Modificaciones a tabla METRICAS
-
-Nuevas columnas:
-  area_zona              DECIMAL(8,6)  ← ancho_norm * alto_norm
-  densidad_por_area      DECIMAL(8,3)  ← detecciones / area_zona  
-  indice_valor_relativo  DECIMAL(5,2)  ← normalizado al promedio del recinto
-  frames_con_actividad   INT           ← frames con >=1 detección en la zona
-
-### Nueva tabla METRICAS_HORARIAS
-
-Para análisis temporal por franjas dentro del video:
-
-CREATE TABLE metricas_horarias (
-  id                BIGINT AUTO_INCREMENT PRIMARY KEY,
-  id_video          BIGINT NOT NULL,
-  id_zona           BIGINT NOT NULL,
-  minuto_inicio     INT NOT NULL,     ← minuto del video donde inicia la franja
-  minuto_fin        INT NOT NULL,     ← minuto del video donde termina
-  total_detecciones INT NOT NULL DEFAULT 0,
-  densidad_relativa DECIMAL(6,3),
-  CONSTRAINT fk_mh_video FOREIGN KEY (id_video) REFERENCES videos(id) ON DELETE CASCADE,
-  CONSTRAINT fk_mh_zona  FOREIGN KEY (id_zona)  REFERENCES zonas(id)  ON DELETE RESTRICT,
-  INDEX idx_mh_video_zona (id_video, id_zona)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-Esta tabla habilita el dashboard "Matriz zona × franja horaria".
-
-## Justificación de no tener id_persona ni tracking
-
-La tabla DETECCIONES no tiene campo id_persona por diseño deliberado:
-- No hacemos tracking entre frames (yolo no lo hace en nuestro pipeline)
-- Identificar personas individuales requiere biometría (ilegal Ley 21.719)
-- La métrica de "persona-segundos" es suficiente para pricing comercial
-- Agregar tracking aumenta complejidad sin aportar valor al caso de uso
-
-Esta decisión es permanente para el MVP y cualquier versión futura.
+- No modificar migraciones aplicadas. Crear nuevas.
+- No agregar columnas a DETECCIONES que permitan identificar personas
+- No crear índices innecesarios (tienen costo en escritura)
+- No usar VARCHAR sin límite o TEXT cuando VARCHAR(n) basta
+- No relajar constraints de FK
+- No almacenar secretos en BD (van en variables de entorno)
+- No cambiar el esquema sin actualizar primero ALCANCE_COMPLETO.md
