@@ -1,5 +1,6 @@
 package cl.duoc.flowsense.recintos.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -15,11 +16,13 @@ public class ZonaRequest {
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "El color debe tener formato #RRGGBB")
     private String colorHex;
 
+    @JsonProperty("xNorm")
     @NotNull
     @DecimalMin("0.0")
     @DecimalMax("1.0")
     private BigDecimal xNorm;
 
+    @JsonProperty("yNorm")
     @NotNull
     @DecimalMin("0.0")
     @DecimalMax("1.0")
