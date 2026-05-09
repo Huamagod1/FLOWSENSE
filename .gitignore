@@ -48,3 +48,7 @@ Producto/python/*.csv
 __pycache__/
 *.pyc
 *.pyo
+
+
+# Claude Code local config
+.claude/
