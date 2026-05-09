@@ -44,3 +44,6 @@ Producto/python/resultado*.csv
 Producto/python/zonas_prueba*.json
 Producto/python/test_*.csv
 Producto/python/test_*.json
+
+# Claude Code - ignorar en cualquier subcarpeta
+**/.claude/
