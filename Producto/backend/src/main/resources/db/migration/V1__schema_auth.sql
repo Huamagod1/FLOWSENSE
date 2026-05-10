@@ -22,6 +22,7 @@ CREATE TABLE USUARIOS (
     rol              VARCHAR(20)  NOT NULL DEFAULT 'ADMIN',
     activo           BOOLEAN      NOT NULL DEFAULT TRUE,
     fecha_creacion   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ultimo_login     DATETIME     NULL,
     PRIMARY KEY (id),
     -- UNIQUE crea implícitamente el índice en email
     UNIQUE KEY uk_usuarios_email (email),

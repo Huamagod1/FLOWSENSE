@@ -9,13 +9,19 @@ import cl.duoc.flowsense.organizaciones.Organizacion;
 import cl.duoc.flowsense.organizaciones.OrganizacionRepository;
 import cl.duoc.flowsense.usuarios.Usuario;
 import cl.duoc.flowsense.usuarios.UsuarioRepository;
+import cl.duoc.flowsense.usuarios.dto.UsuarioDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final String CREDENCIALES_INVALIDAS = "Credenciales inválidas";
 
     private final UsuarioRepository usuarioRepository;
@@ -35,62 +41,74 @@ public class AuthService {
 
     @Transactional
     public AuthResponse registrar(RegistroRequest request) {
-        if (usuarioRepository.findByEmail(request.getEmail()).isPresent()) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        if (usuarioRepository.findByEmail(email).isPresent()) {
+            log.warn("Intento de registro con email duplicado: {}", email);
             throw new ConflictException("El email ya está registrado");
         }
 
         Organizacion organizacion = organizacionRepository.save(
                 Organizacion.builder()
-                        .nombre(request.getNombreOrganizacion())
+                        .nombre(request.getNombre().trim() + " " + request.getApellido().trim())
                         .build()
         );
 
         Usuario usuario = usuarioRepository.save(
                 Usuario.builder()
                         .organizacion(organizacion)
-                        .email(request.getEmail())
+                        .email(email)
                         .passwordHash(passwordEncoder.encode(request.getPassword()))
-                        .nombre(request.getNombre())
-                        .apellido(request.getApellido())
+                        .nombre(request.getNombre().trim())
+                        .apellido(request.getApellido().trim())
                         .build()
         );
 
-        String token = jwtService.generarToken(usuario);
+        log.info("Nuevo usuario registrado: id={}, email={}", usuario.getId(), email);
 
         return AuthResponse.builder()
-                .token(token)
-                .idUsuario(usuario.getId())
-                .email(usuario.getEmail())
-                .idOrganizacion(organizacion.getId())
-                .nombreOrganizacion(organizacion.getNombre())
-                .rol(usuario.getRol())
-                .expiraEn(jwtService.calcularExpiracion())
+                .token(jwtService.generarToken(usuario))
+                .usuario(toDto(usuario))
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request) {
-        Usuario usuario = usuarioRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new AccesoDenegadoException(CREDENCIALES_INVALIDAS));
+        String email = request.getEmail().trim().toLowerCase();
+
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.error("Login fallido: credenciales inválidas");
+                    return new AccesoDenegadoException(CREDENCIALES_INVALIDAS);
+                });
 
         if (!usuario.isActivo()) {
+            log.error("Login fallido: credenciales inválidas");
             throw new AccesoDenegadoException(CREDENCIALES_INVALIDAS);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), usuario.getPasswordHash())) {
+            log.error("Login fallido: credenciales inválidas");
             throw new AccesoDenegadoException(CREDENCIALES_INVALIDAS);
         }
 
-        String token = jwtService.generarToken(usuario);
+        usuario.setUltimoLogin(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        log.info("Login exitoso: id={}", usuario.getId());
 
         return AuthResponse.builder()
-                .token(token)
-                .idUsuario(usuario.getId())
+                .token(jwtService.generarToken(usuario))
+                .usuario(toDto(usuario))
+                .build();
+    }
+
+    private UsuarioDTO toDto(Usuario usuario) {
+        return UsuarioDTO.builder()
+                .id(usuario.getId())
                 .email(usuario.getEmail())
-                .idOrganizacion(usuario.getOrganizacion().getId())
-                .nombreOrganizacion(usuario.getOrganizacion().getNombre())
-                .rol(usuario.getRol())
-                .expiraEn(jwtService.calcularExpiracion())
+                .nombre(usuario.getNombre())
+                .apellido(usuario.getApellido())
                 .build();
     }
 }

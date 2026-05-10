@@ -7,9 +7,6 @@ import lombok.Data;
 public class RegistroRequest {
 
     @NotBlank
-    private String nombreOrganizacion;
-
-    @NotBlank
     @Email
     private String email;
 
