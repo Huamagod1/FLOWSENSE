@@ -54,13 +54,21 @@ public class PythonOrchestratorService {
             throw new ProcesamientoException("No se pudo crear directorio de frames: " + e.getMessage());
         }
 
+        Integer duracion = video.getDuracionSegundos();
+        int frameSegundo;
+        if (duracion == null || duracion <= 0) {
+            frameSegundo = 2;
+        } else {
+            frameSegundo = Math.min(5, duracion - 1);
+        }
+
         List<String> comando = List.of(
                 pythonBin,
                 scriptPath,
                 "--modo", "extraer-frame",
                 "--video", video.getRutaArchivo(),
                 "--frame-output", outputPng.toAbsolutePath().toString(),
-                "--frame-segundo", "5"
+                "--frame-segundo", String.valueOf(frameSegundo)
         );
 
         log.info("Extrayendo frame del video {}: {}", video.getId(), String.join(" ", comando));
@@ -135,14 +143,17 @@ public class PythonOrchestratorService {
                                             Path zonasJsonOutput, Path csvOutput) {
         Map<Integer, Long> mapaZonas = generarZonasJson(zonas, zonasJsonOutput);
 
+        String conf = video.getConfUsado() != null ? video.getConfUsado().toPlainString() : "0.45";
+        String modelo = video.getModeloUsado() != null ? video.getModeloUsado() : "yolov8n";
+
         List<String> comando = List.of(
                 pythonBin,
                 scriptPath,
                 "--video", video.getRutaArchivo(),
                 "--zonas", zonasJsonOutput.toAbsolutePath().toString(),
                 "--output", csvOutput.toAbsolutePath().toString(),
-                "--conf", "0.45",
-                "--modelo", "yolov8n",
+                "--conf", conf,
+                "--modelo", modelo,
                 "--fps", "1"
         );
 

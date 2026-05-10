@@ -22,10 +22,10 @@ public class CsvParserService {
     private static final Logger log = LoggerFactory.getLogger(CsvParserService.class);
     private static final int BATCH_SIZE = 500;
     private static final String INSERT_SQL =
-            "INSERT INTO DETECCIONES (id_video, id_zona, frame_numero, x_centro_norm, y_centro_norm, confianza) " +
-            "VALUES (?, ?, ?, ?, ?, ?)";
+            "INSERT INTO DETECCIONES (id_video, id_zona, frame_numero, x_centro_norm, y_centro_norm, confianza, detenida) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?)";
     private static final int[] TIPOS = {
-            Types.BIGINT, Types.BIGINT, Types.INTEGER, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL
+            Types.BIGINT, Types.BIGINT, Types.INTEGER, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.BOOLEAN
     };
 
     private final JdbcTemplate jdbcTemplate;
@@ -49,7 +49,7 @@ public class CsvParserService {
             while ((linea = reader.readLine()) != null) {
                 fila++;
                 String[] cols = linea.split(",", -1);
-                if (cols.length < 6) {
+                if (cols.length < 7) {
                     log.warn("CSV fila {} inválida (columnas insuficientes), se omite: {}", fila, linea);
                     continue;
                 }
@@ -60,8 +60,9 @@ public class CsvParserService {
                     double x = Double.parseDouble(cols[3].trim());
                     double y = Double.parseDouble(cols[4].trim());
                     double conf = Double.parseDouble(cols[5].trim());
+                    boolean detenida = Boolean.parseBoolean(cols[6].trim());
 
-                    lote.add(new Object[]{video.getId(), idZona, frameNumero, x, y, conf});
+                    lote.add(new Object[]{video.getId(), idZona, frameNumero, x, y, conf, detenida});
                 } catch (NumberFormatException e) {
                     log.warn("CSV fila {} con valor no parseable, se omite: {}", fila, linea);
                     continue;

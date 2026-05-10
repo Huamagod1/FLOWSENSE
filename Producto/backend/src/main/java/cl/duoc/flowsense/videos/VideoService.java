@@ -146,8 +146,9 @@ public class VideoService {
             throw new ValidacionException("El archivo no puede estar vacío");
         }
         String contentType = archivo.getContentType();
-        if (contentType == null || !contentType.startsWith("video/")) {
-            throw new ValidacionException("El archivo debe ser un video (content-type: video/*)");
+        if (contentType == null
+                || (!contentType.equals("video/mp4") && !contentType.equals("application/octet-stream"))) {
+            throw new ValidacionException("El archivo debe ser un video MP4");
         }
         if (archivo.getSize() > MAX_SIZE_BYTES) {
             throw new ValidacionException("El archivo supera el tamaño máximo permitido de 500 MB");

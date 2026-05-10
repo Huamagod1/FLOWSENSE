@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -51,6 +52,12 @@ public class Video {
 
     @Column(name = "detecciones_totales")
     private Integer deteccionesTotales;
+
+    @Column(name = "conf_usado", precision = 4, scale = 3)
+    private BigDecimal confUsado;
+
+    @Column(name = "modelo_usado", length = 20)
+    private String modeloUsado;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
