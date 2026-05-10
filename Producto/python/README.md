@@ -278,3 +278,110 @@ python detector.py `
 | `--fps` | `1` | `0.5 – 5` | Más frames muestreados por segundo; sube para vídeos con movimiento rápido |
 | `--imgsz` | `640` | `320 – 1280` | Mayor resolución, más lento; sube si las personas aparecen pequeñas en el frame |
 | `--max-det` | `300` | `50 – 1000` | Limita detecciones por frame; bajar si hay falsos positivos en escenas muy densas |
+
+---
+
+## Modo extraer-frame
+
+Extrae un frame representativo del video como PNG. Es rápido (~1-2 segundos) y no carga YOLO. Lo usa Spring Boot para obtener la imagen base sobre la que el admin dibuja las zonas.
+
+### Invocación
+
+```powershell
+python detector.py `
+  --modo extraer-frame `
+  --video ..\..\video\p.mp4 `
+  --frame-output frame_test.png `
+  --frame-segundo 5
+```
+
+| Argumento | Requerido | Default | Descripción |
+|---|---|---|---|
+| `--modo extraer-frame` | sí | — | Activa este modo |
+| `--video` | sí | — | Ruta al MP4 |
+| `--frame-output` | sí | — | Ruta del PNG a generar |
+| `--frame-segundo` | no | `5` | Segundo del video a extraer |
+
+### JSON de salida (stdout)
+
+```json
+{
+  "frame_extraido": true,
+  "ruta": "frame_test.png",
+  "ancho": 1920,
+  "alto": 1080,
+  "duracion_seg": 1.43,
+  "status": "OK"
+}
+```
+
+En caso de error (video muy corto, archivo no encontrado):
+
+```json
+{
+  "frame_extraido": false,
+  "status": "ERROR",
+  "mensaje": "No se pudo abrir el video: ..\..\video\p.mp4"
+}
+```
+
+---
+
+## Métrica de tasa de detención
+
+### Qué mide
+
+La tasa de detención indica qué porcentaje de las detecciones en una zona corresponden a personas **quietas** (detenidas) versus personas **en movimiento** (de paso). Una zona con 70% de detención es una zona de interés comercial; una zona con 10% es un corredor de paso.
+
+### Cómo se calcula
+
+Después de procesar todos los frames del video, el sistema hace una pasada final comparando **frames muestreados consecutivos**:
+
+```
+Para cada detección en frame T:
+    Para cada detección en frame T+1 (siguiente muestreado):
+        Si distancia_euclidiana_normalizada(det_T, det_T+1) < 0.05:
+            Marcar det_T como detenida=True
+            Parar búsqueda
+    Si no encontró ninguna cercana:
+        detenida=False
+
+Las detecciones del último frame muestreado siempre quedan detenida=False.
+```
+
+El **umbral 0.05** equivale al 5% del ancho/alto del frame. Con `--fps 1`, compara posiciones entre segundos consecutivos — si una persona no se movió más de 5% del encuadre en 1 segundo, se considera detenida.
+
+### Dónde aparece en la salida
+
+**En el CSV** (`resultado.csv`): columna `detenida` con valores `true` / `false`.
+
+```csv
+id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza,detenida
+1,30,1,0.472000,0.610000,0.8200,false
+1,60,1,0.471000,0.609000,0.7900,true
+```
+
+**En el JSON de resumen** (stdout):
+
+```json
+{
+  "frames_procesados": 180,
+  "detecciones_totales": 312,
+  "detecciones_detenidas": 94,
+  "tasa_detencion_global": 0.301,
+  "duracion_seg": 47.3,
+  "status": "OK"
+}
+```
+
+---
+
+## Troubleshooting común
+
+| Problema | Causa | Solución |
+|---|---|---|
+| `numpy` no instala / error de compilación | Python 3.13+ no tiene wheels precompilados para `numpy==1.26.*` | Usar exactamente **Python 3.12**. Verificar con `python --version` |
+| BOM en JSON de zonas (`json.JSONDecodeError`) | PowerShell `Out-File` agrega BOM al guardar UTF-8 | Ya manejado: `cargar_zonas` usa `utf-8-sig`. Si persiste, abre el archivo con Notepad++ → Encoding → UTF-8 (sin BOM) |
+| `No se pudo abrir el video` | Ruta relativa calculada desde el directorio equivocado | Usar rutas absolutas, o ejecutar desde `Producto/python/` y usar `..\..\video\p.mp4` |
+| `ExecutionPolicy` bloquea el venv | PowerShell impide ejecutar scripts `.ps1` del venv | Ejecutar una vez: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| Error con rutas que tienen espacios | `"Proyecto duoc"` tiene espacio y rompe el parsing | Encerrar la ruta entre comillas dobles: `--video "C:\Proyecto duoc\video\p.mp4"` |

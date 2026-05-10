@@ -4,10 +4,10 @@ import random
 class Detector:
     """Stub intercambiable con detector_core.Detector. No requiere ultralytics."""
 
-    def __init__(self, conf, iou, imgsz):
+    def __init__(self, conf, iou, imgsz, modelo="yolov8n"):
         pass
 
-    def detectar_frame(self, frame):
+    def detectar_frame(self, frame, max_det=300):
         n = random.randint(1, 3)
         detecciones = []
         for _ in range(n):
