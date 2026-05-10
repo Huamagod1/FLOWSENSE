@@ -1,61 +1,71 @@
 services:
-
   mysql:
     image: mysql:8.0
     container_name: flowsense-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: flowsense123
-      MYSQL_DATABASE: flowsense_db
-      MYSQL_USER: flowsense
-      MYSQL_PASSWORD: flowsense123
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-flowsense123}
+      MYSQL_DATABASE: ${DB_NAME:-flowsense}
+      MYSQL_USER: ${DB_USER:-flowsense}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-flowsense123}
     ports:
-      - "330:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - flowsense-net
 
   backend:
-    build: ./backend
+    build:
+      context: ./Producto/backend
+      dockerfile: Dockerfile
     container_name: flowsense-backend
     restart: always
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/flowsense_db
-      SPRING_DATASOURCE_USERNAME: flowsense
-      SPRING_DATASOURCE_PASSWORD: flowsense123
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-flowsense}
+      DB_USER: ${DB_USER:-flowsense}
+      DB_PASSWORD: ${DB_PASSWORD:-flowsense123}
+      JWT_SECRET: ${JWT_SECRET:-cambiar-en-produccion-minimo-32-caracteres-aqui}
+      JWT_EXPIRATION_HOURS: 24
+      PYTHON_BIN: python3
+      PYTHON_SCRIPT: /app/python/detector.py
+      UPLOAD_DIR: /app/uploads
+      RESULTS_DIR: /app/results
+      ZONES_DIR: /app/zones
+      FRAMES_DIR: /app/frames
+      FRONTEND_URL: http://localhost:5173
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     volumes:
-      - ./python:/app/python
-      - ./videos:/app/videos
-    networks:
-      - flowsense-net
-
-  python:
-    build: ./python
-    container_name: flowsense-python
-    restart: "no"
-    volumes:
-      - ./python:/app
-      - ./videos:/app/videos
+      - ./Producto/python:/app/python
+      - uploads_data:/app/uploads
+      - results_data:/app/results
+      - zones_data:/app/zones
+      - frames_data:/app/frames
     networks:
       - flowsense-net
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./Producto/frontend
+      dockerfile: Dockerfile
     container_name: flowsense-frontend
     restart: always
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8080
+      - VITE_API_URL=http://localhost:8080/api
     depends_on:
       - backend
     networks:
@@ -63,6 +73,10 @@ services:
 
 volumes:
   mysql_data:
+  uploads_data:
+  results_data:
+  zones_data:
+  frames_data:
 
 networks:
   flowsense-net:

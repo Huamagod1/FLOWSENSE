@@ -1,0 +1,41 @@
+# ========================================
+# FlowSense - Reglas agregadas
+# ========================================
+
+# Archivos legacy archivados
+._legacy_scratch/
+
+# Videos grandes (no versionar)
+video/*.mp4
+video/*.avi
+video/*.mov
+
+# Modelos YOLO (se descargan automáticamente)
+*.pt
+!Producto/python/modelos/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Variables de entorno
+.env
+.env.local
+!.env.example
+
+# IDE local
+.idea/
+.vscode/settings.json
+
+
+# Claude Code local config
+.claude/
+
+# Archivos de prueba local del detector Python
+Producto/python/resultado*.csv
+Producto/python/zonas_prueba*.json
+Producto/python/zonas_con_bom*.json
+zonas_prueba.json
+zonas_con_bom.json
