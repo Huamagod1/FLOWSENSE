@@ -17,6 +17,10 @@ public interface DeteccionRepository extends JpaRepository<Deteccion, Long> {
     @Query("SELECT DISTINCT d.frameNumero FROM Deteccion d WHERE d.video.id = :idVideo")
     List<Integer> findDistinctFrameNumeroByVideoId(@Param("idVideo") Long idVideo);
 
+    @Query(value = "SELECT x_centro_norm, y_centro_norm, id_zona FROM DETECCIONES WHERE id_video = :idVideo",
+           nativeQuery = true)
+    List<Object[]> findHeatmapRawByVideoId(@Param("idVideo") Long idVideo);
+
     @Transactional
     @Modifying
     @Query(value = "DELETE FROM DETECCIONES WHERE id_video = :idVideo", nativeQuery = true)

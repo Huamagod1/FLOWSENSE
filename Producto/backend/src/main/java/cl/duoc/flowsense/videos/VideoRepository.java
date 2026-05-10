@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import cl.duoc.flowsense.videos.EstadoVideo;
 
 @Repository
 public interface VideoRepository extends JpaRepository<Video, Long> {
@@ -20,4 +21,6 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
 
     @Query("SELECT v FROM Video v JOIN FETCH v.recinto WHERE v.id = :id")
     Optional<Video> findByIdWithRecinto(@Param("id") Long id);
+
+    List<Video> findByEstado(EstadoVideo estado);
 }

@@ -22,6 +22,8 @@ public class MetricaResponse {
     private BigDecimal areaZona;
     private BigDecimal densidadPorArea;
     private BigDecimal indiceValorRelativo;
+    private BigDecimal tasaDetencion;
+    private BigDecimal scoreCompuesto;
 
     public static MetricaResponse from(Metrica m) {
         return MetricaResponse.builder()
@@ -37,6 +39,8 @@ public class MetricaResponse {
                 .areaZona(m.getAreaZona())
                 .densidadPorArea(m.getDensidadPorArea())
                 .indiceValorRelativo(m.getIndiceValorRelativo())
+                .tasaDetencion(m.getTasaDetencion())
+                .scoreCompuesto(m.getScoreCompuesto())
                 .build();
     }
 }

@@ -57,6 +57,12 @@ public class Metrica {
     @Column(name = "indice_valor_relativo", nullable = false, precision = 6, scale = 3)
     private BigDecimal indiceValorRelativo;
 
+    @Column(name = "tasa_detencion", precision = 5, scale = 4)
+    private BigDecimal tasaDetencion;
+
+    @Column(name = "score_compuesto", precision = 6, scale = 3)
+    private BigDecimal scoreCompuesto;
+
     @CreationTimestamp
     @Column(name = "fecha_calculo", nullable = false, updatable = false)
     private LocalDateTime fechaCalculo;

@@ -1,11 +1,13 @@
 package cl.duoc.flowsense.videos;
 
+import cl.duoc.flowsense.common.exceptions.ConflictException;
 import cl.duoc.flowsense.common.exceptions.RecursoNoEncontradoException;
 import cl.duoc.flowsense.common.exceptions.ValidacionException;
 import cl.duoc.flowsense.recintos.ZonaService;
 import cl.duoc.flowsense.recintos.dto.ZonasGuardarRequest;
 import cl.duoc.flowsense.videos.dto.GuardarZonasYProcesarRequest;
 import cl.duoc.flowsense.videos.dto.MetricaResponse;
+import cl.duoc.flowsense.videos.dto.MetricaTemporalResponse;
 import cl.duoc.flowsense.videos.dto.PrecioSugeridoZona;
 import cl.duoc.flowsense.videos.dto.ResumenAnalisisResponse;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
@@ -31,15 +33,18 @@ public class AnalisisService {
 
     private final VideoRepository videoRepository;
     private final MetricaRepository metricaRepository;
+    private final MetricaTemporalRepository metricaTemporalRepository;
     private final ZonaService zonaService;
     private final VideoAsyncProcessor asyncProcessor;
 
     public AnalisisService(VideoRepository videoRepository,
                            MetricaRepository metricaRepository,
+                           MetricaTemporalRepository metricaTemporalRepository,
                            ZonaService zonaService,
                            VideoAsyncProcessor asyncProcessor) {
         this.videoRepository = videoRepository;
         this.metricaRepository = metricaRepository;
+        this.metricaTemporalRepository = metricaTemporalRepository;
         this.zonaService = zonaService;
         this.asyncProcessor = asyncProcessor;
     }
@@ -107,6 +112,64 @@ public class AnalisisService {
                 .precioBaseClp(precioBase)
                 .preciosSugeridos(preciosSugeridos)
                 .build();
+    }
+
+    public List<MetricaResponse> obtenerMetricas(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdWithRecintoAndOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        if (video.getEstado() != EstadoVideo.COMPLETADO) {
+            throw new ConflictException("El análisis no está completo");
+        }
+
+        return metricaRepository.findByVideoIdWithZonaOrderByTotalDeteccionesDesc(idVideo)
+                .stream()
+                .map(MetricaResponse::from)
+                .toList();
+    }
+
+    public List<MetricaTemporalResponse> obtenerMetricasTemporales(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdWithRecintoAndOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        if (video.getEstado() != EstadoVideo.COMPLETADO) {
+            throw new ConflictException("El análisis no está completo");
+        }
+
+        return metricaTemporalRepository
+                .findByVideoIdWithZonaOrderByZonaAndFranja(idVideo)
+                .stream()
+                .map(MetricaTemporalResponse::from)
+                .toList();
+    }
+
+    public List<PrecioSugeridoZona> calcularPrecioSugeridoConScore(Long idVideo, Long idOrg, Integer precioBase) {
+        Video video = videoRepository.findByIdWithRecintoAndOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        if (video.getEstado() != EstadoVideo.COMPLETADO) {
+            throw new ConflictException("El análisis no está completo");
+        }
+
+        List<Metrica> metricas = metricaRepository.findByVideoIdWithZonaOrderByTotalDeteccionesDesc(idVideo);
+        return metricas.stream()
+                .map(m -> {
+                    BigDecimal score = m.getScoreCompuesto() != null
+                            ? m.getScoreCompuesto()
+                            : m.getIndiceValorRelativo();
+                    Integer precio = BigDecimal.valueOf(precioBase)
+                            .multiply(score)
+                            .setScale(0, RoundingMode.HALF_UP)
+                            .intValue();
+                    return PrecioSugeridoZona.builder()
+                            .idZona(m.getZona().getId())
+                            .nombreZona(m.getZona().getNombre())
+                            .indiceValorRelativo(m.getIndiceValorRelativo())
+                            .scoreCompuesto(score)
+                            .precioSugeridoClp(precio)
+                            .build();
+                })
+                .toList();
     }
 
     private PrecioSugeridoZona calcularPrecioSugerido(Metrica metrica, Integer precioBase) {

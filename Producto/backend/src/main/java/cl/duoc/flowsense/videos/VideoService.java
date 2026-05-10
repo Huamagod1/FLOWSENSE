@@ -1,9 +1,12 @@
 package cl.duoc.flowsense.videos;
 
+import cl.duoc.flowsense.common.exceptions.ConflictException;
 import cl.duoc.flowsense.common.exceptions.RecursoNoEncontradoException;
 import cl.duoc.flowsense.common.exceptions.ValidacionException;
 import cl.duoc.flowsense.recintos.Recinto;
 import cl.duoc.flowsense.recintos.RecintoRepository;
+import cl.duoc.flowsense.videos.dto.DeteccionHeatmapPoint;
+import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
 import org.slf4j.Logger;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
@@ -26,15 +30,18 @@ public class VideoService {
 
     private final VideoRepository videoRepository;
     private final RecintoRepository recintoRepository;
+    private final DeteccionRepository deteccionRepository;
     private final VideoAsyncProcessor asyncProcessor;
     private final String uploadDir;
 
     public VideoService(VideoRepository videoRepository,
                         RecintoRepository recintoRepository,
+                        DeteccionRepository deteccionRepository,
                         VideoAsyncProcessor asyncProcessor,
                         @Value("${app.upload-dir}") String uploadDir) {
         this.videoRepository = videoRepository;
         this.recintoRepository = recintoRepository;
+        this.deteccionRepository = deteccionRepository;
         this.asyncProcessor = asyncProcessor;
         this.uploadDir = uploadDir;
     }
@@ -90,6 +97,56 @@ public class VideoService {
         Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
         return VideoResponse.from(video);
+    }
+
+    @Transactional(readOnly = true)
+    public EstadoVideoResponse obtenerEstado(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+        return EstadoVideoResponse.builder()
+                .id(video.getId())
+                .estado(video.getEstado())
+                .mensajeError(video.getMensajeError())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeteccionHeatmapPoint> listarDeteccionesHeatmap(Long idVideo, Long idOrg) {
+        videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        List<Object[]> rows = deteccionRepository.findHeatmapRawByVideoId(idVideo);
+        return rows.stream()
+                .map(row -> DeteccionHeatmapPoint.builder()
+                        .x(toBigDecimal(row[0]))
+                        .y(toBigDecimal(row[1]))
+                        .zonaId(row[2] != null ? ((Number) row[2]).longValue() : null)
+                        .build())
+                .toList();
+    }
+
+    @Transactional
+    public void eliminar(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        if (video.getEstado() == EstadoVideo.PROCESANDO) {
+            throw new ConflictException("No se puede eliminar un video en procesamiento");
+        }
+
+        borrarSilencioso(Paths.get(video.getRutaArchivo()));
+        if (video.getRutaFramePreview() != null) {
+            borrarSilencioso(Paths.get(video.getRutaFramePreview()));
+        }
+
+        videoRepository.delete(video);
+        log.info("Video {} eliminado (org {})", idVideo, idOrg);
+    }
+
+    private BigDecimal toBigDecimal(Object val) {
+        if (val instanceof BigDecimal bd) return bd;
+        if (val instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        return BigDecimal.ZERO;
     }
 
     @Transactional(readOnly = true)
