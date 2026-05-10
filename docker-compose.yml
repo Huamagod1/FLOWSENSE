@@ -1,49 +1,49 @@
 services:
-
   mysql:
     image: mysql:8.0
     container_name: flowsense-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: flowsense123
-      MYSQL_DATABASE: flowsense_db
-      MYSQL_USER: flowsense
-      MYSQL_PASSWORD: flowsense123
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-flowsense123}
+      MYSQL_DATABASE: ${DB_NAME:-flowsense}
+      MYSQL_USER: ${DB_USER:-flowsense}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-flowsense123}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - flowsense-net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - flowsense-net
 
   backend:
-    build: ./Producto/backend
+    build:
+      context: ./Producto/backend
+      dockerfile: Dockerfile
     container_name: flowsense-backend
     restart: always
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/flowsense_db
-      SPRING_DATASOURCE_USERNAME: flowsense
-      SPRING_DATASOURCE_PASSWORD: flowsense123
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
-      MAIL_HOST: ${MAIL_HOST:-localhost}
-      MAIL_PORT: ${MAIL_PORT:-1025}
-      MAIL_USERNAME: ${MAIL_USERNAME:-dummy}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-dummy}
-      MAIL_FROM: ${MAIL_FROM:-noreply@flowsense.local}
-      PYTHON_BIN: python
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-flowsense}
+      DB_USER: ${DB_USER:-flowsense}
+      DB_PASSWORD: ${DB_PASSWORD:-flowsense123}
+      JWT_SECRET: ${JWT_SECRET:-cambiar-en-produccion-minimo-32-caracteres-aqui}
+      JWT_EXPIRATION_HOURS: 24
+      PYTHON_BIN: python3
       PYTHON_SCRIPT: /app/python/detector.py
       UPLOAD_DIR: /app/uploads
       RESULTS_DIR: /app/results
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      ZONES_DIR: /app/zones
+      FRAMES_DIR: /app/frames
+      FRONTEND_URL: http://localhost:5173
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     depends_on:
       mysql:
         condition: service_healthy
@@ -51,30 +51,21 @@ services:
       - ./Producto/python:/app/python
       - uploads_data:/app/uploads
       - results_data:/app/results
-    networks:
-      - flowsense-net
-
-  python:
-    build: ./Producto/python
-    container_name: flowsense-python
-    restart: "no"
-    volumes:
-      - ./Producto/python:/app
-      - uploads_data:/app/uploads
+      - zones_data:/app/zones
+      - frames_data:/app/frames
     networks:
       - flowsense-net
 
   frontend:
-    build: ./Producto/frontend
+    build:
+      context: ./Producto/frontend
+      dockerfile: Dockerfile
     container_name: flowsense-frontend
     restart: always
     ports:
       - "5173:5173"
-    volumes:
-      - ./Producto/frontend:/app
-      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8080
+      - VITE_API_URL=http://localhost:8080/api
     depends_on:
       - backend
     networks:
@@ -84,6 +75,8 @@ volumes:
   mysql_data:
   uploads_data:
   results_data:
+  zones_data:
+  frames_data:
 
 networks:
   flowsense-net:

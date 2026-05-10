@@ -29,26 +29,13 @@ venv/
 .idea/
 .vscode/settings.json
 
-# Archivos de prueba de Python (no deben versionarse)
-Producto/python/resultado*.csv
-Producto/python/zonas_*.json
-Producto/python/tests/__pycache__/
-zonas_prueba.json
-
-# Salidas locales
-*.log
-
-# Resultados de pruebas locales Python
-Producto/python/resultado*.csv
-Producto/python/zonas_*.json
-zonas_prueba.json
-Producto/python/*.csv
-
-# Caché de Python
-__pycache__/
-*.pyc
-*.pyo
-
 
 # Claude Code local config
 .claude/
+
+# Archivos de prueba local del detector Python
+Producto/python/resultado*.csv
+Producto/python/zonas_prueba*.json
+Producto/python/zonas_con_bom*.json
+zonas_prueba.json
+zonas_con_bom.json

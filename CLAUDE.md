@@ -4,213 +4,223 @@ Este archivo da contexto global a Claude Code para todo el repositorio. Los `CLA
 
 ## Qué es FlowSense
 
-Plataforma web SaaS que analiza el flujo peatonal en espacios comerciales (malls, galerías, ferias) mediante visión artificial. El administrador sube un video MP4, define zonas sobre el plano del recinto y obtiene métricas objetivas de tráfico por zona para justificar precios de arriendo ante arrendatarios.
+Plataforma web SaaS que analiza el flujo peatonal en espacios comerciales (malls, galerías, ferias) mediante visión artificial. El administrador sube un video MP4, define zonas sobre un frame del video y obtiene métricas objetivas de valor comercial por zona para apoyar decisiones de pricing de arriendo.
 
 El producto es **offline por diseño**: no analiza video en tiempo real ni requiere hardware especial. Procesa MP4 ya grabados con cámara de seguridad o celular.
+
+## Problema que resuelve
+
+Los administradores de espacios comerciales en Chile fijan precios de arriendo sin datos objetivos. Esto genera dos problemas: el administrador pierde dinero cobrando de menos en zonas valiosas, y los arrendatarios se sienten engañados sin justificación verificable. FlowSense democratiza el acceso a analítica de tráfico peatonal, antes reservada para grandes operadores con sistemas profesionales costosos como Brickstream o Sensormatic.
+
+## Fundamento conceptual del producto
+
+FlowSense implementa la métrica **OTS (Opportunity To See)** aplicada al retail interior. Esta métrica es estándar en la industria publicitaria desde los años 80 y se usa globalmente para fijar precios de exposición visual en espacios comerciales.
+
+La idea base es: el valor comercial de una ubicación es proporcional al tiempo total que las personas pasan ahí, no solo al conteo de personas únicas. Una zona con 100 personas-segundo de exposición vale el doble que una con 50, sin importar si fueron 100 personas pasando rápido o 20 personas detenidas.
+
+Por diseño matemático, al muestrear video a 1 frame por segundo, cada detección equivale a 1 segundo de presencia humana en una zona. Acumular detecciones por zona = acumular persona-segundos = medir OTS. La métrica emerge naturalmente del muestreo simple sin necesidad de tracking individual.
+
+## Las 4 métricas del MVP
+
+El sistema entrega 4 métricas por cada zona definida:
+
+| Métrica | Qué mide | Decisión que habilita |
+|---------|----------|----------------------|
+| Tráfico relativo | Detecciones por zona, normalizado al promedio del recinto | Ranking de zonas más vs menos transitadas |
+| Tasa de detención | % de detecciones que aparecen detenidas vs caminando | Distinguir paso de interés comercial |
+| Patrón temporal | Variación del tráfico durante el video, dividido en franjas | Pricing diferenciado por horario |
+| Score compuesto | Combinación ponderada de las anteriores en un solo número | Traducción directa a precio sugerido |
+
+El score compuesto se calcula como:
+
+```
+score = (0.40 × indice_trafico) + 
+        (0.30 × tasa_detencion) + 
+        (0.20 × densidad_normalizada) + 
+        (0.10 × consistencia_temporal)
+```
+
+Donde cada componente está normalizado al promedio del recinto. Una zona con score 2.5x se interpreta como "el doble y medio del valor del local promedio del recinto".
 
 ## Stack técnico
 
 | Capa | Tecnología | Deploy |
-|---|---|---|
-| Frontend | React 18 + Vite + react-router-dom 6 | Vercel |
-| Backend | Spring Boot 3 + Java 21 + Spring Security + JWT | Railway |
-| Visión IA | Python 3.11 + YOLOv8n (ultralytics) + OpenCV | Proceso invocado desde Spring Boot vía ProcessBuilder |
+|------|-----------|--------|
+| Frontend | React 18 + Vite + react-router-dom 6 + react-konva + recharts + heatmap.js | Vercel |
+| Backend | Spring Boot 3 + Java 17 + Spring Security + JWT + Spring Mail | Railway |
+| Visión IA | Python 3.12 + YOLOv8 (ultralytics 8.3.x) + OpenCV | Proceso invocado vía ProcessBuilder |
 | Base de datos | MySQL 8 | Railway (plugin) |
-| Email | Spring Mail con Gmail SMTP o Mailtrap | Dev/Prod |
 | Orquestación local | Docker Compose | Todos los devs |
 
-## Arquitectura en una frase
+**Versión de Python crítica**: usar Python 3.12. No 3.11 ni 3.13+. Razón: compatibilidad con wheels precompilados de numpy 1.26 y ultralytics 8.3.
 
-React sube MP4 → Spring Boot lo almacena y orquesta el pipeline → invoca Python vía ProcessBuilder → Python procesa con YOLOv8 y escribe CSV anónimo → Spring Boot lee CSV, inserta en MySQL y calcula métricas agregadas → React consulta API REST y renderiza heatmap + dashboard.
+## Arquitectura del flujo principal
+
+El flujo completo desde que el admin sube un video hasta que recibe las métricas:
+
+```
+1. Admin sube MP4 desde React → Spring Boot
+2. Spring Boot guarda MP4, crea VIDEOS con estado=PENDIENTE
+3. Spring Boot invoca Python: --modo extraer-frame
+4. Python extrae frame del segundo 5, devuelve PNG
+5. Estado=FRAME_LISTO, frontend redirige al editor de zonas
+6. Admin dibuja rectángulos sobre el frame con react-konva
+7. Estado=ESPERANDO_ZONAS mientras dibuja
+8. Admin guarda zonas y lanza análisis
+9. Spring Boot invoca Python: --modo detectar (detección completa)
+10. Python procesa el video con YOLOv8 y escribe CSV anónimo
+11. Spring Boot lee CSV, inserta en DETECCIONES, calcula las 4 métricas
+12. Estado=COMPLETADO, frontend redirige al dashboard
+13. Admin ve métricas, score y precios sugeridos
+14. Admin exporta reporte PDF para negociación con arrendatarios
+```
 
 ## Estructura del repositorio
 
 ```
 FLOWSENSE/
-├── CLAUDE.md                    ← este archivo (contexto global)
-├── README.md                    ← portada para humanos: cómo levantar el stack
-├── ALCANCE_COMPLETO.md          ← fuente única de verdad del alcance funcional
+├── CLAUDE.md                       ← este archivo
+├── README.md                       ← portada para humanos
+├── ALCANCE_COMPLETO.md             ← alcance funcional MVP
+├── ROADMAP_POST_MVP.md             ← funcionalidades planificadas fuera de alcance
+├── ESTADO_PROYECTO.md              ← snapshot de progreso (se actualiza periódicamente)
 ├── docker-compose.yml
-├── Documentacion/               ← entregables académicos
-│   └── docs/                    ← EV-01 (registro), EV-02 (Figma), EV-03 (MER), etc.
-├── Gestion/                     ← documentos internos del equipo
-│   └── Integrantes.txt
-├── Producto/                    ← entregable técnico (todo el código)
-│   ├── python/                  ← detector YOLOv8
-│   │   └── CLAUDE.md
-│   ├── backend/                 ← API Spring Boot
-│   │   └── CLAUDE.md
-│   ├── frontend/                ← SPA React
-│   │   └── CLAUDE.md
-│   └── database/                ← migraciones SQL y MER
-│       └── CLAUDE.md
-└── video/                       ← videos de prueba/demo (no se versionan grandes)
+├── Documentacion/                  ← entregables académicos
+├── Gestion/                        ← documentos del equipo
+└── Producto/                       ← código fuente
+    ├── python/                     ← detector YOLOv8
+    ├── backend/                    ← API Spring Boot
+    ├── frontend/                   ← SPA React
+    └── database/                   ← migraciones SQL y MER
 ```
-
-## Material de prueba del MVP
-
-Para validación académica se graban **2 videos de 15 minutos** en el mismo recinto, en horarios de contraste:
-
-- **Video 1 — Hora pico**: sábado mediodía o viernes tarde-noche. Rico en detecciones, ideal para demos visuales.
-- **Video 2 — Hora valle**: día de semana media tarde o mañana temprano. Referencia baja para la comparativa.
-
-Esta doble muestra permite alimentar la vista comparativa (HU-05) y demostrar que el sistema es sensible a variación temporal, no solo a volumen absoluto.
-
-Los videos se guardan en `/video/` y **no se versionan en Git** (añadir `video/*.mp4` al `.gitignore`).
 
 ## Decisiones cerradas del producto
 
-### Un solo rol: ADMINISTRADOR
+### Modelo de usuarios
 
-El sistema tiene un solo rol funcional. No hay superadmin, no hay arrendatarios, no hay empleados. La gestión de usuarios se hace mediante dos vías: registro público y invitación entre admins dentro de una misma organización.
+- Un solo rol: ADMINISTRADOR
+- Concepto de ORGANIZACIÓN (admins pueden invitar a otros admins, opcional)
+- Registro público + invitación entre admins (post-MVP)
+- JWT stateless (24h, HS256, BCrypt strength 10)
 
-### Concepto de organización
+### Modelo de detección
 
-Cada usuario pertenece a una `ORGANIZACION`. Los recintos son propiedad de la organización, no del usuario individual. Esto permite que un mall con varios administradores compartan los mismos recintos. Al registrarse públicamente se crea automáticamente una organización.
+- YOLOv8 con classes=[0] (solo personas) del dataset COCO
+- 3 modelos soportados: yolov8n (default), yolov8s, yolov8m
+- NO tracking entre frames (decisión ética)
+- Métrica derivada: persona-segundos por zona = OTS
+- Las zonas son filtro POSTERIOR a YOLO (YOLO detecta en todo el frame)
 
-### Autenticación con JWT stateless
+### Material de prueba del MVP académico
 
-JWT en `Authorization: Bearer <token>` con expiración de 24h. Secret en variable de entorno `JWT_SECRET`. Sin sesiones server-side, sin cookies.
+- 1 video controlado: experimento con guión donde tú sabes el ground truth
+- 1 video real: 3-15 minutos de un recinto real (galería, café, pasillo)
+- Análisis comparativo entre conteo manual y conteo del sistema
+- Documentación del experimento como evidencia de validación
 
-### Contraseñas con BCrypt
+### Restricciones éticas no negociables
 
-Nunca texto plano, nunca MD5/SHA1. BCrypt strength 10.
+Estas restricciones aplican a todo el sistema. Si una implementación las viola, debe cuestionarse:
 
-### Recuperación de contraseña con email real
-
-Vía Spring Mail. En dev se usa Mailtrap o Gmail SMTP con contraseña de aplicación. En prod, servicio real. Tokens expiran en 24h.
-
-### Procesamiento offline de video
-
-Python se invoca como subproceso asincrónico desde Spring Boot (`ProcessBuilder` + `@Async`). No hay websockets, no hay streaming. El frontend hace polling cada 3s al endpoint de estado hasta que el video quede en `COMPLETADO`.
-
-## Restricciones éticas no negociables
-
-Estas restricciones se aplican en toda la capa de detección y persistencia. Si una implementación propuesta las viola, debe cuestionarse antes de escribir código:
-
-- **Nunca** almacenar imágenes de personas. Los frames se procesan en RAM y se descartan.
-- **Nunca** implementar reconocimiento facial ni tracking individual.
-- **Nunca** guardar en BD nada que permita identificar a una persona (caras, ropa, contextura). Solo coordenadas numéricas.
-- Cumplimiento Ley 19.628 y Ley 21.719 de Chile.
+- NUNCA almacenar imágenes de personas (procesamiento solo en RAM)
+- NUNCA implementar reconocimiento facial ni tracking individual
+- NUNCA guardar datos que permitan identificar individuos
+- Cumplimiento Ley 19.628 y Ley 21.719 de Chile (datos personales y biometría)
+- Contraseñas SIEMPRE con BCrypt strength 10
+- JWT secret en variable de entorno, nunca hardcoded
+- HTTPS obligatorio en producción
 
 ## Convenciones de equipo
 
 ### Equipo y responsables por capa
 
-| Integrante | Rol principal | Carpetas que toca principalmente |
-|---|---|---|
-| Fernando Huamanchumo | Frontend / Dashboard | `/Producto/frontend` |
-| Fernando Tapia | Backend + Visión IA | `/Producto/python`, `/Producto/backend` |
-| Octavio Ibáñez | DBA + QA + Docs | `/Producto/database`, `/Documentacion` |
+| Integrante | Rol principal | Carpetas que lidera |
+|-----------|---------------|---------------------|
+| Fernando Huamanchumo | Frontend / Dashboard | /Producto/frontend |
+| Fernando Tapia | Backend + Visión IA | /Producto/python, /Producto/backend |
+| Octavio Ibáñez | DBA + QA + Docs | /Producto/database, /Documentacion |
 
-Todos los integrantes pueden tocar cualquier área; los responsables son quienes lideran decisiones de esa capa, no dueños exclusivos.
+Todos pueden tocar cualquier área. Los responsables lideran decisiones, no son dueños exclusivos.
 
 ### Git workflow
 
-- **Ramas principales**: `main` (producción), `develop` (integración).
-- **Ramas feature**: `feature/<area>-<descripcion-corta>`. Ejemplos: `feature/python-detector`, `feature/backend-auth`, `feature/frontend-login`.
-- **PR obligatorio** para mergear a `develop`. Al menos una revisión antes de merge.
-- **Merge a `main`** solo al cierre de cada sprint, con todos los tests pasando.
-- **Commits** en español, formato imperativo: "agrega endpoint de login", "corrige cálculo de métricas por zona".
+- Ramas principales: `main` (producción), `develop` (integración)
+- Ramas feature: `feature/<area>-<descripcion>`. Ejemplos: `feature/python-detector`, `feature/backend-auth-pipeline`
+- PR obligatorio para mergear a `develop`. Al menos una revisión.
+- Merge a `main` solo al cierre de cada sprint con todos los tests pasando
+- Commits en español, formato imperativo: "agrega endpoint X", "corrige cálculo Y"
+- Convención de commits para issues: incluir referencia al ticket en el mensaje cuando aplique
 
 ### Entorno de desarrollo
 
-Todo el equipo usa Docker Compose para levantar el stack completo. Un desarrollador que clona el repo debería poder correr `docker compose up` y tener backend + python + MySQL corriendo. El frontend se levanta aparte con `npm run dev` para hot reload.
+- Docker Compose para levantar el stack completo
+- Python 3.12 obligatorio (no usar otra versión)
+- VS Code con extensión de Claude Code recomendada
+- En equipos nuevos: clonar, ejecutar Docker, instalar Python 3.12, crear venv
 
 ### Documentación académica
 
 El proyecto es parte de TPY1101 (DuocUC). Las decisiones priorizan:
-1. **Trazabilidad** — cada HU está vinculada a una evidencia verificable.
-2. **Claridad** — el código y los nombres son autoexplicativos.
-3. **Simplicidad** — no optimizar prematuramente. Un MVP funcional es mejor que un sistema complejo incompleto.
+1. Trazabilidad: cada HU vinculada a evidencia verificable
+2. Claridad: código y nombres autoexplicativos
+3. Simplicidad: no optimizar prematuramente, MVP funcional > sistema complejo incompleto
+4. Validación empírica: cada feature crítica debe tener prueba que demuestre que funciona
 
-## Planificación vigente (Carta Gantt)
+## Planificación de sprints (5 sprints totales)
 
-Los sprints y su alcance están en `ALCANCE_COMPLETO.md`. Estado actual: **Sprint 2 en curso (semanas 3-4)**.
+### Sprint 1 ✅ Completado
+- Setup repo, Docker, estructura, CLAUDE.md base
 
-### Entregables clave del Sprint 2
+### Sprint 2 🔄 En curso
+- Pipeline Python con YOLOv8 ✅
+- Modos stub y preview ✅
+- Soporte multi-modelo ✅
+- Backend: autenticación básica (registro, login, JWT)
+- Frontend: vistas de login y registro
+- Backend: endpoint de upload de video
+- Backend: orquestación con ProcessBuilder
 
-- **Pipeline core Python + Backend**:
-  - `detector.py` que procesa MP4 → CSV anónimo
-  - Endpoints Spring Boot: upload de video, estado, orquestación con ProcessBuilder
-  - Inserción masiva de detecciones en MySQL + cálculo de métricas
-- **Autenticación básica**:
-  - Tablas `usuarios`, `organizaciones`, `tokens_auth` en MySQL
-  - Endpoints `/api/auth/registro`, `/api/auth/login` con JWT
-  - Filtro de seguridad JWT aplicado a rutas `/api/**`
+### Sprint 3 📋 Planificado
+- Modo `--modo extraer-frame` en Python
+- Endpoint backend para servir el frame
+- Editor visual de zonas en React (react-konva)
+- Persistencia de zonas en BD
+- Estados expandidos del video
+- Flujo end-to-end: subir → zonas → procesar → CSV en BD
 
-Los detalles específicos por capa están en el `CLAUDE.md` de cada subcarpeta.
+### Sprint 4 📋 Planificado
+- Implementación de las 4 métricas
+- Cálculo de tasa de detención (Python o backend)
+- Cálculo del score compuesto
+- Cálculo del patrón temporal
+- Dashboard React con heatmap, tabla y matriz temporal
+- Sistema de precios sugeridos
+
+### Sprint 5 📋 Planificado (cierre)
+- Grabación de videos de validación
+- Procesamiento y análisis comparativo
+- Documento técnico de validación empírica
+- Exportación PDF de reportes
+- Documentación final del proyecto
+- Preparación de presentación
 
 ## Referencias cruzadas
 
 - Alcance funcional completo: `ALCANCE_COMPLETO.md`
-- Detalles de detección: `Producto/python/CLAUDE.md`
-- API REST: `Producto/backend/CLAUDE.md`
-- Vistas y rutas: `Producto/frontend/CLAUDE.md`
-- MER y migraciones: `Producto/database/CLAUDE.md`
+- Roadmap post-MVP: `ROADMAP_POST_MVP.md`
+- Estado actual: `ESTADO_PROYECTO.md`
+- Detalles Python: `Producto/python/CLAUDE.md`
+- Detalles Backend: `Producto/backend/CLAUDE.md`
+- Detalles Frontend: `Producto/frontend/CLAUDE.md`
+- Detalles BD: `Producto/database/CLAUDE.md`
 
-## Qué esperar de Claude Code al trabajar en este repo
+## Qué esperar de Claude Code en este repo
 
-- Respetar las restricciones éticas en todo código relacionado con procesamiento de video.
-- Seguir las convenciones de Git del equipo (ramas, PRs, formato de commits).
-- Consultar `ALCANCE_COMPLETO.md` antes de proponer cambios funcionales que afecten múltiples capas.
-- Priorizar legibilidad sobre "cleverness" — este es código que revisa un docente y mantiene un equipo que está aprendiendo.
-- Nunca generar código que guarde frames, imágenes de personas o datos biométricos.
-- Nunca hardcodear secrets, tokens JWT, contraseñas ni credenciales de email en el código.
-
-## Archivos legacy de la raíz (pendiente de limpiar)
-
-Los siguientes archivos en la raíz del repo son de pruebas previas y **no forman parte del producto oficial**. Deben ignorarse o eliminarse en una tarea de limpieza:
-
-- `main.py`, `tracker.py`, `coco.txt`, `yolov8s.pt`, `video.zip`, `__pycache__/`
-
-El código oficial vive exclusivamente dentro de `/Producto/*`.
-
-## Decisión de versión Python
-
-El proyecto usa Python 3.12 (no 3.11 como se indicó originalmente). 
-Razón: compatibilidad con wheels precompilados de numpy 1.26 y ultralytics 
-8.3.x. Python 3.13+ causa problemas de compilación con estas dependencias.
-Todo el equipo debe usar Python 3.12 en todos los equipos de desarrollo.
-
-## Modelos YOLOv8 soportados
-
-El sistema soporta tres modelos intercambiables via CLI (--modelo):
-
-| Modelo | Tamaño | Velocidad CPU | Precisión | Cuándo usar |
-|--------|--------|---------------|-----------|-------------|
-| yolov8n | 6 MB | ~0.6s/frame | Base | Pruebas, demos rápidos |
-| yolov8s | 22 MB | ~1.5s/frame | Media | Recintos típicos (default recomendado) |
-| yolov8m | 52 MB | ~3.5s/frame | Alta | Escenas densas (ferias, malls llenos) |
-
-Default actual: yolov8n (por backward compatibility). 
-Recomendado para producción: yolov8s o yolov8m.
-
-## Fundamento conceptual del producto
-
-FlowSense mide "exposición comercial ponderada por tiempo". Cada 
-detección en el CSV representa un instante de presencia humana en una 
-zona. Al muestrear a 1 fps, cada detección equivale a 1 segundo de 
-presencia. La acumulación de detecciones por zona es equivalente a 
-"persona-segundos", la unidad de exposición comercial.
-
-Esta métrica es estándar en el retail y la publicidad exterior (OTS: 
-Opportunity To See). No distingue entre atención activa y pasiva porque:
-1. La exposición periférica tiene valor comercial demostrado
-2. La presencia física genera prueba social (atrae a otros)
-3. A escala, la distribución de intenciones es proporcional entre zonas
-4. Medir intenciones individuales requeriría biometría (ilegal en Chile)
-
-## Flujo del editor de zonas
-
-El flujo correcto de análisis incluye un paso de definición de zonas 
-ANTES del procesamiento del video:
-
-1. Admin sube MP4 → estado PENDIENTE
-2. Python extrae frame representativo (segundo 5) → estado FRAME_LISTO
-3. Admin ve el frame, dibuja rectángulos sobre él → estado ESPERANDO_ZONAS
-4. Admin guarda zonas y lanza análisis → estado PROCESANDO
-5. Python detecta con esas zonas → estado COMPLETADO
-
-Las zonas se dibujan sobre el frame del video (no un plano abstracto) 
-para que las coordenadas sean directamente aplicables.
+- Respetar restricciones éticas en todo código que toque video o personas
+- Seguir convenciones de Git (ramas, PRs, formato de commits)
+- Consultar `ALCANCE_COMPLETO.md` antes de proponer cambios funcionales
+- Priorizar legibilidad sobre "cleverness"
+- Nunca generar código que guarde frames, imágenes de personas o datos biométricos
+- Nunca hardcodear secrets, tokens, contraseñas
+- Cuando una decisión técnica afecte múltiples capas, mencionarlo explícitamente
+- Antes de modificar comportamiento existente, garantizar backward compatibility
