@@ -1,28 +1,29 @@
 services:
-
   mysql:
     image: mysql:8.0
     container_name: flowsense-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-flowsense_root}
-      MYSQL_DATABASE: ${DB_NAME:-flowsense_db}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-flowsense123}
+      MYSQL_DATABASE: ${DB_NAME:-flowsense}
       MYSQL_USER: ${DB_USER:-flowsense}
       MYSQL_PASSWORD: ${DB_PASSWORD:-flowsense123}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./Producto/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    networks:
-      - flowsense-net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+    networks:
+      - flowsense-net
 
   backend:
-    build: ./Producto/backend
+    build:
+      context: ./Producto/backend
+      dockerfile: Dockerfile
     container_name: flowsense-backend
     restart: always
     ports:
@@ -30,10 +31,10 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-flowsense_db}
+      DB_NAME: ${DB_NAME:-flowsense}
       DB_USER: ${DB_USER:-flowsense}
       DB_PASSWORD: ${DB_PASSWORD:-flowsense123}
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production_min_32_chars}
+      JWT_SECRET: ${JWT_SECRET:-cambiar-en-produccion-minimo-32-caracteres-aqui}
       JWT_EXPIRATION_HOURS: 24
       PYTHON_BIN: python3
       PYTHON_SCRIPT: /app/python/detector.py
@@ -55,27 +56,16 @@ services:
     networks:
       - flowsense-net
 
-  python:
-    build: ./Producto/python
-    container_name: flowsense-python
-    restart: "no"
-    volumes:
-      - ./Producto/python:/app
-      - uploads_data:/app/uploads
-      - results_data:/app/results
-      - zones_data:/app/zones
-      - frames_data:/app/frames
-    networks:
-      - flowsense-net
-
   frontend:
-    build: ./Producto/frontend
+    build:
+      context: ./Producto/frontend
+      dockerfile: Dockerfile
     container_name: flowsense-frontend
     restart: always
     ports:
-      - "5173:80"
+      - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8080/api
+      - VITE_API_URL=http://localhost:8080/api
     depends_on:
       - backend
     networks:
