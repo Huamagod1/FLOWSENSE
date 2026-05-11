@@ -104,13 +104,16 @@ public class VideoAsyncProcessor {
 
             int insertadas = csvParser.parsearYPersistir(resultado.csvPath(), video, resultado.mapaZonas());
 
+            // framesProcesados debe estar disponible antes de calcular métricas temporales
+            video.setFramesProcesados(resultado.framesProcesados());
+            video.setDeteccionesTotales(insertadas);
+            videoRepository.save(video);
+
             List<cl.duoc.flowsense.videos.Metrica> metricas =
                     metricasCalculator.calcularYPersistir(video, zonas);
 
             video.setEstado(EstadoVideo.COMPLETADO);
             video.setMensajeError(null);
-            video.setFramesProcesados(resultado.framesProcesados());
-            video.setDeteccionesTotales(insertadas);
             videoRepository.save(video);
 
             log.info("Análisis completado para video {}: {} detecciones, {} métricas",

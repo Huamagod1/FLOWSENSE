@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 public class MetricasCalculatorService {
 
     private static final Logger log = LoggerFactory.getLogger(MetricasCalculatorService.class);
-    private static final int NUM_FRANJAS = 5;
 
     private final JdbcTemplate jdbcTemplate;
     private final MetricaRepository metricaRepository;
@@ -159,12 +158,13 @@ public class MetricasCalculatorService {
         Map<Long, Integer> totalPorZona = metricas.stream()
                 .collect(Collectors.toMap(m -> m.getZona().getId(), Metrica::getTotalDetecciones));
 
-        int size = Math.max(1, totalFrames / NUM_FRANJAS);
+        int numFranjas = totalFrames >= 30 ? 5 : (totalFrames >= 10 ? 3 : 2);
+        int size = Math.max(1, totalFrames / numFranjas);
         List<MetricaTemporal> temporales = new ArrayList<>();
 
-        for (int i = 0; i < NUM_FRANJAS; i++) {
+        for (int i = 0; i < numFranjas; i++) {
             int frameInicio = i * size;
-            int frameFin = (i == NUM_FRANJAS - 1) ? totalFrames : (i + 1) * size;
+            int frameFin = (i == numFranjas - 1) ? totalFrames : (i + 1) * size;
 
             Map<Long, Integer> countPorZona = countDeteccionesEnFranja(idVideo, frameInicio, frameFin);
 
@@ -176,7 +176,7 @@ public class MetricasCalculatorService {
                 BigDecimal densidadRelativa = BigDecimal.ZERO.setScale(3);
                 if (totalZona > 0) {
                     BigDecimal avgPorFranja = BigDecimal.valueOf(totalZona)
-                            .divide(BigDecimal.valueOf(NUM_FRANJAS), 4, RoundingMode.HALF_UP);
+                            .divide(BigDecimal.valueOf(numFranjas), 4, RoundingMode.HALF_UP);
                     if (avgPorFranja.compareTo(BigDecimal.ZERO) > 0) {
                         densidadRelativa = BigDecimal.valueOf(count)
                                 .divide(avgPorFranja, 3, RoundingMode.HALF_UP);
@@ -197,7 +197,7 @@ public class MetricasCalculatorService {
 
         metricaTemporalRepository.saveAll(temporales);
         log.info("Métricas temporales para video {}: {} franjas × {} zonas",
-                idVideo, NUM_FRANJAS, zonas.size());
+                idVideo, numFranjas, zonas.size());
     }
 
     private Map<Long, Integer> countDeteccionesEnFranja(Long idVideo, int frameInicio, int frameFin) {

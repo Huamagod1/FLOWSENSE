@@ -91,11 +91,11 @@ export default function EditorZonasPage() {
         setZonas(res.data.map((z, i) => ({
           id: Date.now() + i,
           nombre: z.nombre,
-          color: z.color_hex || COLORES_DEFAULT[i % COLORES_DEFAULT.length],
-          x: z.x_norm * anchoCv,
-          y: z.y_norm * altoCv,
-          width: z.ancho_norm * anchoCv,
-          height: z.alto_norm * altoCv,
+          color: z.colorHex || COLORES_DEFAULT[i % COLORES_DEFAULT.length],
+          x: z.xNorm * anchoCv,
+          y: z.yNorm * altoCv,
+          width: z.anchoNorm * anchoCv,
+          height: z.altoNorm * altoCv,
         })))
         contadorRef.current = res.data.length + 1
       }
@@ -103,13 +103,17 @@ export default function EditorZonasPage() {
   }, [id])
 
   useEffect(() => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
-    const token = localStorage.getItem('flowsense_token')
-    const img = new window.Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => setFrameImg(img)
-    img.onerror = () => setError('No se pudo cargar la imagen del frame')
-    img.src = `${baseUrl}/videos/${id}/frame-preview/imagen${token ? `?token=${token}` : ''}`
+    let objectUrl = null
+    api.get(`/videos/${id}/frame-preview/imagen`, { responseType: 'blob' })
+      .then(res => {
+        objectUrl = URL.createObjectURL(res.data)
+        const img = new window.Image()
+        img.onload = () => setFrameImg(img)
+        img.onerror = () => setError('No se pudo cargar la imagen del frame')
+        img.src = objectUrl
+      })
+      .catch(() => setError('No se pudo cargar la imagen del frame'))
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [id])
 
   const CANVAS_W = 800
@@ -176,11 +180,11 @@ export default function EditorZonasPage() {
     setError('')
     const payload = zonas.map(z => ({
       nombre: z.nombre,
-      color_hex: z.color,
-      x_norm: z.x / CANVAS_W,
-      y_norm: z.y / CANVAS_H,
-      ancho_norm: z.width / CANVAS_W,
-      alto_norm: z.height / CANVAS_H,
+      colorHex: z.color,
+      xNorm: z.x / CANVAS_W,
+      yNorm: z.y / CANVAS_H,
+      anchoNorm: z.width / CANVAS_W,
+      altoNorm: z.height / CANVAS_H,
     }))
     try {
       await api.put(`/videos/${id}/zonas`, payload)
@@ -200,11 +204,11 @@ export default function EditorZonasPage() {
     setGuardando(true)
     const payload = zonas.map(z => ({
       nombre: z.nombre,
-      color_hex: z.color,
-      x_norm: z.x / CANVAS_W,
-      y_norm: z.y / CANVAS_H,
-      ancho_norm: z.width / CANVAS_W,
-      alto_norm: z.height / CANVAS_H,
+      colorHex: z.color,
+      xNorm: z.x / CANVAS_W,
+      yNorm: z.y / CANVAS_H,
+      anchoNorm: z.width / CANVAS_W,
+      altoNorm: z.height / CANVAS_H,
     }))
     try {
       await api.put(`/videos/${id}/zonas`, payload)

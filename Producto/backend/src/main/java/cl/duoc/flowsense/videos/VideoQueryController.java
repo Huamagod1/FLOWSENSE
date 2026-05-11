@@ -1,6 +1,10 @@
 package cl.duoc.flowsense.videos;
 
 import cl.duoc.flowsense.common.security.CurrentUser;
+import cl.duoc.flowsense.recintos.ZonaService;
+import cl.duoc.flowsense.recintos.dto.ZonaRequest;
+import cl.duoc.flowsense.recintos.dto.ZonaResponse;
+import cl.duoc.flowsense.recintos.dto.ZonasGuardarRequest;
 import cl.duoc.flowsense.videos.dto.DeteccionHeatmapPoint;
 import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
@@ -24,13 +28,16 @@ public class VideoQueryController {
 
     private final VideoService videoService;
     private final AnalisisService analisisService;
+    private final ZonaService zonaService;
     private final CurrentUser currentUser;
 
     public VideoQueryController(VideoService videoService,
                                 AnalisisService analisisService,
+                                ZonaService zonaService,
                                 CurrentUser currentUser) {
         this.videoService = videoService;
         this.analisisService = analisisService;
+        this.zonaService = zonaService;
         this.currentUser = currentUser;
     }
 
@@ -82,6 +89,29 @@ public class VideoQueryController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(imagen);
+    }
+
+    // ── Zonas ─────────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/zonas")
+    public ResponseEntity<List<ZonaResponse>> zonas(@PathVariable Long id) {
+        VideoResponse video = videoService.obtener(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.ok(zonaService.listarPorRecinto(video.getIdRecinto(), currentUser.getIdOrganizacion()));
+    }
+
+    @PutMapping("/{id}/zonas")
+    public ResponseEntity<List<ZonaResponse>> guardarZonas(
+            @PathVariable Long id,
+            @RequestBody List<ZonaRequest> zonas) {
+        VideoResponse video = videoService.obtener(id, currentUser.getIdOrganizacion());
+        ZonasGuardarRequest request = new ZonasGuardarRequest();
+        request.setZonas(zonas);
+        return ResponseEntity.ok(zonaService.guardarZonas(video.getIdRecinto(), request, currentUser.getIdOrganizacion()));
+    }
+
+    @PostMapping("/{id}/zonas/confirmar")
+    public ResponseEntity<VideoResponse> confirmarZonas(@PathVariable Long id) {
+        return ResponseEntity.ok(analisisService.confirmarYProcesar(id, currentUser.getIdOrganizacion()));
     }
 
     // ── Análisis ──────────────────────────────────────────────────────────────

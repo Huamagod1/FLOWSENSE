@@ -141,7 +141,7 @@ public class PythonOrchestratorService {
 
     public DeteccionResult detectarCompleto(Video video, List<Zona> zonas,
                                             Path zonasJsonOutput, Path csvOutput) {
-        Map<Integer, Long> mapaZonas = generarZonasJson(zonas, zonasJsonOutput);
+        Map<Integer, Long> mapaZonas = generarZonasJson(video.getId(), zonas, zonasJsonOutput);
 
         String conf = video.getConfUsado() != null ? video.getConfUsado().toPlainString() : "0.45";
         String modelo = video.getModeloUsado() != null ? video.getModeloUsado() : "yolov8n";
@@ -229,7 +229,7 @@ public class PythonOrchestratorService {
         return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, csvOutput, mapaZonas);
     }
 
-    private Map<Integer, Long> generarZonasJson(List<Zona> zonas, Path destino) {
+    private Map<Integer, Long> generarZonasJson(Long idVideo, List<Zona> zonas, Path destino) {
         Map<Integer, Long> mapaZonas = new LinkedHashMap<>();
         List<Map<String, Object>> lista = new ArrayList<>();
 
@@ -245,9 +245,13 @@ public class PythonOrchestratorService {
             mapaZonas.put(i, z.getId());
         }
 
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("id_video", idVideo);
+        payload.put("zonas", lista);
+
         try {
             Files.createDirectories(destino.getParent());
-            objectMapper.writeValue(destino.toFile(), lista);
+            objectMapper.writeValue(destino.toFile(), payload);
         } catch (IOException e) {
             throw new ProcesamientoException("No se pudo escribir el JSON de zonas: " + e.getMessage());
         }

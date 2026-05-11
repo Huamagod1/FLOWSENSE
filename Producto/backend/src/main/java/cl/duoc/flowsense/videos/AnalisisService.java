@@ -80,6 +80,25 @@ public class AnalisisService {
         return VideoResponse.from(video);
     }
 
+    public VideoResponse confirmarYProcesar(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdWithRecintoAndOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        if (!ESTADOS_PERMITIDOS_PARA_PROCESAR.contains(video.getEstado())) {
+            throw new ValidacionException(
+                    "El video no está en un estado válido para procesar (estado actual: " + video.getEstado() + ")");
+        }
+
+        video.setEstado(EstadoVideo.PROCESANDO);
+        video.setMensajeError(null);
+        video = videoRepository.save(video);
+
+        asyncProcessor.procesarDeteccionAsync(idVideo);
+
+        log.info("Análisis lanzado para video {} (confirmar)", idVideo);
+        return VideoResponse.from(video);
+    }
+
     public ResumenAnalisisResponse obtenerResumen(Long idVideo, Long idOrg) {
         Video video = videoRepository.findByIdWithRecintoAndOrganizacionId(idVideo, idOrg)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));

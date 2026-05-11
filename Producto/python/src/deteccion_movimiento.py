@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 
 
-def calcular_detenidas(detecciones, umbral=0.05):
+def calcular_detenidas(detecciones, umbral=0.08):
     """
     Marca cada detección como 'detenida' si en el siguiente frame muestreado
     existe otra detección dentro de la distancia euclidiana normalizada `umbral`.
