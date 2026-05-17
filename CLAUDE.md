@@ -107,8 +107,9 @@ FLOWSENSE/
 
 - YOLOv8 con classes=[0] (solo personas) del dataset COCO
 - 3 modelos soportados: yolov8n (default), yolov8s, yolov8m
-- NO tracking entre frames (decisión ética)
-- Métrica derivada: persona-segundos por zona = OTS
+- Tracking anónimo con ByteTrack (lapx): asigna track_id temporal (entero) por persona dentro del video; sin biometría ni identidad persistente
+- track_id = -1 para detecciones sin track asignado (compatibilidad hacia atrás con videos procesados antes del tracking)
+- Métrica derivada: persona-segundos por zona = OTS; con tracking: OTS sin doble conteo vía SUM de frames por track_id
 - Las zonas son filtro POSTERIOR a YOLO (YOLO detecta en todo el frame)
 
 ### Material de prueba del MVP académico
@@ -123,8 +124,9 @@ FLOWSENSE/
 Estas restricciones aplican a todo el sistema. Si una implementación las viola, debe cuestionarse:
 
 - NUNCA almacenar imágenes de personas (procesamiento solo en RAM)
-- NUNCA implementar reconocimiento facial ni tracking individual
-- NUNCA guardar datos que permitan identificar individuos
+- NUNCA implementar reconocimiento facial ni tracking biométrico (sin rasgos faciales, edad, género, color de ropa ni identidad persistente entre sesiones)
+- El tracking anónimo con ByteTrack está permitido: track_id es un entero temporal dentro de la sesión de procesamiento del video, sin vinculación a identidad real
+- NUNCA guardar datos que permitan identificar individuos fuera de su sesión de procesamiento
 - Cumplimiento Ley 19.628 y Ley 21.719 de Chile (datos personales y biometría)
 - Contraseñas SIEMPRE con BCrypt strength 10
 - JWT secret en variable de entorno, nunca hardcoded

@@ -25,6 +25,8 @@ def parsear_args():
     p.add_argument("--max-det",  type=int, default=300,
                    help="Máximo de detecciones por frame (default: 300, igual al default de ultralytics 8.3)")
     p.add_argument("--stub",    action="store_true", help="Usar detecciones ficticias sin cargar YOLO")
+    p.add_argument("--tracker", default="bytetrack", choices=["bytetrack", "none"],
+                   help="Motor de tracking (default: bytetrack). 'none' desactiva el tracking.")
     p.add_argument("--preview", action="store_true", help="Mostrar ventana de visualización en vivo (solo desarrollo)")
 
     # Argumentos de modo extraer-frame (validados programáticamente en detector.py)

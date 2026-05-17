@@ -57,6 +57,7 @@ python detector.py \
 | `--modelo` | detectar | no | `yolov8n` | `yolov8n`, `yolov8s`, `yolov8m` |
 | `--max-det` | detectar | no | 300 | Máximo de detecciones por frame |
 | `--stub` | detectar | no | False | Usar stub dummy en lugar de YOLO |
+| `--tracker` | detectar | no | `bytetrack` | Motor de tracking: `bytetrack` o `none` |
 | `--preview` | detectar | no | False | Ventana OpenCV en vivo |
 | `--frame-output` | extraer-frame | sí (en su modo) | — | Ruta del PNG a guardar |
 | `--frame-segundo` | extraer-frame | no | 5 | Segundo del video a extraer |
@@ -80,16 +81,17 @@ Coordenadas normalizadas entre 0 y 1. El parser usa `utf-8-sig` para tolerar BOM
 ### CSV de salida (en modo detectar)
 
 ```csv
-id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza,detenida
-42,30,1,0.47,0.61,0.82,false
-42,30,2,0.73,0.28,0.91,false
-42,60,1,0.45,0.58,0.77,true
+id_video,frame_numero,zona_id,track_id,x_centro_norm,y_centro_norm,confianza,detenida
+42,30,1,1,0.47,0.61,0.82,false
+42,30,2,2,0.73,0.28,0.91,false
+42,60,1,1,0.45,0.58,0.77,true
 ```
 
 Columnas:
 - `id_video`: ID del video desde el JSON
 - `frame_numero`: número del frame procesado
 - `zona_id`: ID de la zona donde cae el centro de la detección
+- `track_id`: ID de track asignado por ByteTrack (entero ≥ 1); -1 si el tracker no asignó ID (compat. hacia atrás)
 - `x_centro_norm`, `y_centro_norm`: coordenadas normalizadas del centro de la caja
 - `confianza`: confianza de YOLO entre 0 y 1
 - `detenida`: `true` si la detección aparece quieta en el frame siguiente
@@ -106,9 +108,26 @@ Si una detección cae fuera de todas las zonas, se descarta (no se escribe).
   "tasa_detencion_global": 0.349,
   "duracion_seg": 245,
   "modelo_usado": "yolov8n",
+  "personas_unicas_total": 234,
+  "tiempo_permanencia_promedio_global": 18.4,
+  "flujo_entre_zonas": [
+    {"zona_origen": 1, "zona_destino": 2, "conteo": 87}
+  ],
+  "metricas_por_zona": {
+    "1": {
+      "personas_unicas": 120,
+      "tiempo_permanencia_promedio": 22.1,
+      "entradas": 125,
+      "salidas": 118,
+      "ots_tracking": 2652,
+      "velocidad_flujo_promedio": 0.034
+    }
+  },
   "status": "OK"
 }
 ```
+
+Los campos de tracking son opcionales en el JSON: si `--tracker none`, no aparecen. Spring Boot lee ambos formatos sin error.
 
 ### JSON de resumen modo extraer-frame
 
@@ -177,12 +196,15 @@ Producto/python/
 │   ├── zonas.py                 ← cargar_zonas, asignar_zona
 │   ├── filtros.py               ← caja_valida, frame_valido
 │   ├── deteccion_movimiento.py  ← cálculo de tasa de detención
+│   ├── tracker.py               ← wrapper ByteTrack (model.track con persist=True)
+│   ├── metricas_tracking.py     ← funciones puras sobre DataFrame del CSV
 │   ├── output.py                ← escritura CSV y JSON resumen
 │   └── preview.py               ← ventana OpenCV en vivo
 ├── tests/
 │   ├── test_zonas.py
 │   ├── test_carga_zonas.py
-│   └── test_deteccion_movimiento.py
+│   ├── test_deteccion_movimiento.py
+│   └── test_metricas_tracking.py
 └── modelos/
     └── .gitkeep                 ← yolov8*.pt se descargan acá
 ```
@@ -251,7 +273,6 @@ Abre ventana OpenCV con bounding boxes en vivo. Solo funciona localmente (no en 
 
 ## Lo que Claude Code NO debe hacer en este módulo
 
-- No proponer DeepSORT/ByteTrack para tracking individual (post-MVP)
 - No guardar frames como imágenes para debug (excepto modo extraer-frame)
 - No extraer embeddings faciales o features biométricos
 - No mezclar lógica con acceso directo a MySQL
