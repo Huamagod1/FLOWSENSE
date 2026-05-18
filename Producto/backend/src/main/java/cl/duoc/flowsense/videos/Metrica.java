@@ -63,6 +63,32 @@ public class Metrica {
     @Column(name = "score_compuesto", precision = 6, scale = 3)
     private BigDecimal scoreCompuesto;
 
+    // ── Campos de tracking (nulos si el video se procesó sin tracker) ──────────
+
+    @Column(name = "personas_unicas")
+    private Integer personasUnicas;
+
+    @Column(name = "tiempo_permanencia_prom")
+    private Double tiempoPermanenciaProm;
+
+    @Column(name = "entradas")
+    private Integer entradas;
+
+    @Column(name = "salidas")
+    private Integer salidas;
+
+    @Column(name = "ots_tracking")
+    private Double otsTracking;
+
+    @Column(name = "velocidad_flujo_prom")
+    private Double velocidadFlujoProm;
+
+    @Column(name = "tasa_conversion")
+    private Double tasaConversion;
+
+    @Column(name = "score_compuesto_v2")
+    private Double scoreCompuestoV2;
+
     @CreationTimestamp
     @Column(name = "fecha_calculo", nullable = false, updatable = false)
     private LocalDateTime fechaCalculo;

@@ -5,6 +5,7 @@ import cl.duoc.flowsense.procesamiento.DeteccionResult;
 import cl.duoc.flowsense.procesamiento.FrameExtractionResult;
 import cl.duoc.flowsense.procesamiento.MetricasCalculatorService;
 import cl.duoc.flowsense.procesamiento.PythonOrchestratorService;
+import cl.duoc.flowsense.procesamiento.TrackingMetricsService;
 import cl.duoc.flowsense.recintos.Zona;
 import cl.duoc.flowsense.recintos.ZonaRepository;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ public class VideoAsyncProcessor {
     private final PythonOrchestratorService pythonOrchestrator;
     private final CsvParserService csvParser;
     private final MetricasCalculatorService metricasCalculator;
+    private final TrackingMetricsService trackingMetricsService;
     private final String resultsDir;
 
     public VideoAsyncProcessor(
@@ -39,6 +41,7 @@ public class VideoAsyncProcessor {
             PythonOrchestratorService pythonOrchestrator,
             CsvParserService csvParser,
             MetricasCalculatorService metricasCalculator,
+            TrackingMetricsService trackingMetricsService,
             @Value("${app.results-dir}") String resultsDir) {
         this.videoRepository = videoRepository;
         this.zonaRepository = zonaRepository;
@@ -46,6 +49,7 @@ public class VideoAsyncProcessor {
         this.pythonOrchestrator = pythonOrchestrator;
         this.csvParser = csvParser;
         this.metricasCalculator = metricasCalculator;
+        this.trackingMetricsService = trackingMetricsService;
         this.resultsDir = resultsDir;
     }
 
@@ -111,6 +115,10 @@ public class VideoAsyncProcessor {
 
             List<cl.duoc.flowsense.videos.Metrica> metricas =
                     metricasCalculator.calcularYPersistir(video, zonas);
+
+            if (resultado.trackingData() != null) {
+                trackingMetricsService.persistirTracking(video, resultado.mapaZonas(), resultado.trackingData());
+            }
 
             video.setEstado(EstadoVideo.COMPLETADO);
             video.setMensajeError(null);

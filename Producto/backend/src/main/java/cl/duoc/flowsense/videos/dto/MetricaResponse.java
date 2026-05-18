@@ -25,6 +25,16 @@ public class MetricaResponse {
     private BigDecimal tasaDetencion;
     private BigDecimal scoreCompuesto;
 
+    // ── Campos de tracking (null si el video se procesó sin tracker) ──────────
+    private Integer personasUnicas;
+    private Double tiempoPermanenciaProm;
+    private Integer entradas;
+    private Integer salidas;
+    private Double otsTracking;
+    private Double velocidadFlujoProm;
+    private Double tasaConversion;
+    private Double scoreCompuestoV2;
+
     public static MetricaResponse from(Metrica m) {
         return MetricaResponse.builder()
                 .idZona(m.getZona().getId())
@@ -41,6 +51,14 @@ public class MetricaResponse {
                 .indiceValorRelativo(m.getIndiceValorRelativo())
                 .tasaDetencion(m.getTasaDetencion())
                 .scoreCompuesto(m.getScoreCompuesto())
+                .personasUnicas(m.getPersonasUnicas())
+                .tiempoPermanenciaProm(m.getTiempoPermanenciaProm())
+                .entradas(m.getEntradas())
+                .salidas(m.getSalidas())
+                .otsTracking(m.getOtsTracking())
+                .velocidadFlujoProm(m.getVelocidadFlujoProm())
+                .tasaConversion(m.getTasaConversion())
+                .scoreCompuestoV2(m.getScoreCompuestoV2())
                 .build();
     }
 }

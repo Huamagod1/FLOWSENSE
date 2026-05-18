@@ -73,6 +73,10 @@ public class MetricasCalculatorService {
                     .densidadPorArea(densidadPorArea)
                     .indiceValorRelativo(calcIndice(totalZona, totalVideo, numZonas))
                     .tasaDetencion(agg.tasaDetencion())
+                    .personasUnicas(agg.personasUnicas() > 0 ? (int) agg.personasUnicas() : null)
+                    .otsTracking(agg.otsTracking() > 0 ? (double) agg.otsTracking() : null)
+                    .tiempoPermanenciaProm(agg.personasUnicas() > 0
+                            ? (double) agg.otsTracking() / agg.personasUnicas() : null)
                     .build();
 
             metricas.add(m);
@@ -115,7 +119,9 @@ public class MetricasCalculatorService {
         jdbcTemplate.query(
                 "SELECT id_zona, COUNT(*) AS total, COUNT(DISTINCT frame_numero) AS frames_activos, " +
                 "AVG(confianza) AS conf_prom, " +
-                "SUM(CASE WHEN detenida = 1 THEN 1 ELSE 0 END) AS sum_detenida " +
+                "SUM(CASE WHEN detenida = 1 THEN 1 ELSE 0 END) AS sum_detenida, " +
+                "COUNT(DISTINCT CASE WHEN track_id >= 0 THEN track_id ELSE NULL END) AS personas_unicas, " +
+                "SUM(CASE WHEN track_id >= 0 THEN 1 ELSE 0 END) AS ots_tracking " +
                 "FROM DETECCIONES " +
                 "WHERE id_video = ? AND id_zona IS NOT NULL " +
                 "GROUP BY id_zona",
@@ -126,8 +132,11 @@ public class MetricasCalculatorService {
                     BigDecimal confProm = rs.getBigDecimal("conf_prom");
                     if (confProm == null) confProm = BigDecimal.ZERO;
                     long sumDetenida = rs.getLong("sum_detenida");
+                    long personasUnicas = rs.getLong("personas_unicas");
+                    long otsTracking = rs.getLong("ots_tracking");
                     mapa.put(idZona, new ZoneAgg(total, framesActivos,
-                            confProm.setScale(3, RoundingMode.HALF_UP), sumDetenida));
+                            confProm.setScale(3, RoundingMode.HALF_UP), sumDetenida,
+                            personasUnicas, otsTracking));
                 }, idVideo);
         return mapa;
     }
@@ -277,8 +286,9 @@ public class MetricasCalculatorService {
 
     // ── Tipo interno ─────────────────────────────────────────────────────
 
-    private record ZoneAgg(long total, long framesActivos, BigDecimal confProm, long sumDetenida) {
-        static final ZoneAgg EMPTY = new ZoneAgg(0L, 0L, BigDecimal.ZERO.setScale(3), 0L);
+    private record ZoneAgg(long total, long framesActivos, BigDecimal confProm, long sumDetenida,
+                            long personasUnicas, long otsTracking) {
+        static final ZoneAgg EMPTY = new ZoneAgg(0L, 0L, BigDecimal.ZERO.setScale(3), 0L, 0L, 0L);
 
         BigDecimal tasaDetencion() {
             if (total == 0) return BigDecimal.ZERO.setScale(4);
