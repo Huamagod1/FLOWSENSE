@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Table, Input, Button, Spin, Card, Statistic, Row, Col, Alert, Tooltip as AntTooltip, Progress } from 'antd'
+import { Table, Input, Button, Spin, Card, Statistic, Row, Col, Alert, Tooltip as AntTooltip, Progress, Tabs } from 'antd'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -9,6 +9,10 @@ import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import api from '../api/axiosConfig'
 import { usePolling } from '../hooks/usePolling'
+import TrayectoriasCanvas from '../components/TrayectoriasCanvas'
+import FlujoSankeyChart from '../components/FlujoSankeyChart'
+import MetricasTrackingPanel from '../components/MetricasTrackingPanel'
+import { getTracks, getFlujoZonas, getMetricasTracking } from '../api/tracking'
 
 const PRIMARY = '#7C3AED'
 const clp = n => `$${Number(n).toLocaleString('es-CL')}`
@@ -101,10 +105,16 @@ export default function ResultadosPage() {
   const [frameSrc, setFrameSrc] = useState(null)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [bannerVisible, setBannerVisible] = useState(true)
+  const [zones, setZones] = useState([])
+  const [tracks, setTracks] = useState([])
+  const [flujoZonas, setFlujoZonas] = useState([])
+  const [metricasTracking, setMetricasTracking] = useState([])
+  const [activeTab, setActiveTab] = useState('analisis')
 
   const canvasRef = useRef()
   const imgRef = useRef()
   const reporteRef = useRef()
+  const trackingReporteRef = useRef()
 
   const pollingActivo = estado !== 'COMPLETADO' && estado !== 'ERROR'
 
@@ -128,6 +138,10 @@ export default function ResultadosPage() {
     api.get(`/videos/${id}/detecciones`).then(r => setDetecciones(r.data || [])).catch(() => {})
     api.get(`/videos/${id}/metricas`).then(r => setMetricas(r.data || [])).catch(() => {})
     api.get(`/videos/${id}/metricas-temporales`).then(r => setMetricasTemporales(r.data || [])).catch(() => {})
+    api.get(`/videos/${id}/zonas`).then(r => setZones(r.data || [])).catch(() => {})
+    getTracks(id).then(r => setTracks(r.data || [])).catch(() => {})
+    getFlujoZonas(id).then(r => setFlujoZonas(r.data || [])).catch(() => {})
+    getMetricasTracking(id).then(r => setMetricasTracking(r.data || [])).catch(() => {})
   }, [estado, id])
 
   useEffect(() => {
@@ -188,6 +202,25 @@ export default function ResultadosPage() {
       pdf.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, 10, 21)
       pdf.text(`Video ID: ${id}`, 10, 27)
       pdf.addImage(imgData, 'PNG', 10, 33, imgW, Math.min(imgH, pageH - 43))
+
+      const tEl = trackingReporteRef.current
+      const hayDatosTracking = flujoZonas.length > 0 || tracks.length > 0
+      if (tEl && hayDatosTracking) {
+        const prevStyle = tEl.getAttribute('style') || ''
+        tEl.setAttribute('style',
+          'display:block !important; position:fixed; left:-9999px; top:0; z-index:-1; background:white; width:900px; padding:20px;')
+        await new Promise(resolve => setTimeout(resolve, 120))
+        const tCanvas = await html2canvas(tEl, { scale: 1.5, useCORS: true })
+        tEl.setAttribute('style', prevStyle)
+        const tImgH = (tCanvas.height * imgW) / tCanvas.width
+        pdf.addPage()
+        pdf.setFontSize(14); pdf.setTextColor(124, 58, 237)
+        pdf.text('Análisis de Trayectorias (ByteTrack)', 10, 14)
+        pdf.setFontSize(10); pdf.setTextColor(100, 100, 100)
+        pdf.text(`Video ID: ${id}`, 10, 21)
+        pdf.addImage(tCanvas.toDataURL('image/png'), 'PNG', 10, 28, imgW, Math.min(tImgH, pageH - 38))
+      }
+
       pdf.save(`reporte-flowsense-${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch { setMensajeError('Error al generar el PDF') }
   }
@@ -389,7 +422,16 @@ export default function ResultadosPage() {
           message="📊 Este reporte mide exposición comercial por zona usando la métrica OTS (Opportunity To See). Cada detección equivale a 1 segundo de presencia humana. Una zona con más detecciones tiene mayor valor comercial." />
       )}
 
-      <div id="reporte" ref={reporteRef}>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        destroyInactiveTabPane={false}
+        items={[
+          {
+            key: 'analisis',
+            label: 'Análisis',
+            children: (
+        <div id="reporte" ref={reporteRef}>
 
         {/* ── Cards de resumen ─────────────────────────────────────────── */}
         <div className="section">
@@ -802,6 +844,52 @@ export default function ResultadosPage() {
         )}
 
       </div>
+            ),
+          },
+          {
+            key: 'tracking',
+            label: 'Tracking',
+            children: (
+              <div ref={trackingReporteRef}>
+                <div className="section">
+                  <Card>
+                    <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#111827' }}>Trayectorias y zonas</h3>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+                      Las burbujas muestran el número de personas únicas por zona. Las flechas indican flujo entre zonas.
+                    </p>
+                    <TrayectoriasCanvas
+                      frameSrc={frameSrc}
+                      zones={zones}
+                      metricas={metricas}
+                      flujoZonas={flujoZonas}
+                    />
+                  </Card>
+                </div>
+
+                {flujoZonas.length > 0 && (
+                  <div className="section">
+                    <Card>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#111827' }}>Flujo entre zonas</h3>
+                      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
+                        Trayectorias que conectan zonas distintas. Identifica rutas de circulación frecuentes.
+                      </p>
+                      <FlujoSankeyChart flujoZonas={flujoZonas} zones={zones} />
+                    </Card>
+                  </div>
+                )}
+
+                <div className="section">
+                  <MetricasTrackingPanel
+                    metricas={metricas}
+                    metricasTracking={metricasTracking}
+                    zones={zones}
+                  />
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

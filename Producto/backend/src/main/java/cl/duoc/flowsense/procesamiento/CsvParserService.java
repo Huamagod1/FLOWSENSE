@@ -21,11 +21,15 @@ public class CsvParserService {
 
     private static final Logger log = LoggerFactory.getLogger(CsvParserService.class);
     private static final int BATCH_SIZE = 500;
+
+    // Formato nuevo (8 col): id_video, frame_numero, zona_id, track_id, x, y, conf, detenida
     private static final String INSERT_SQL =
-            "INSERT INTO DETECCIONES (id_video, id_zona, frame_numero, x_centro_norm, y_centro_norm, confianza, detenida) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            "INSERT INTO DETECCIONES (id_video, id_zona, frame_numero, x_centro_norm, y_centro_norm, confianza, detenida, track_id) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     private static final int[] TIPOS = {
-            Types.BIGINT, Types.BIGINT, Types.INTEGER, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.BOOLEAN
+            Types.BIGINT, Types.BIGINT, Types.INTEGER,
+            Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.BOOLEAN,
+            Types.INTEGER
     };
 
     private final JdbcTemplate jdbcTemplate;
@@ -34,8 +38,6 @@ public class CsvParserService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    // CSV esperado: id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza
-    // zona_id es el índice 0-based que Python asignó; mapaZonas lo traduce al id real de BD.
     @Transactional
     public int parsearYPersistir(Path csvPath, Video video, Map<Integer, Long> mapaZonas) throws IOException {
         List<Object[]> lote = new ArrayList<>(BATCH_SIZE);
@@ -49,6 +51,9 @@ public class CsvParserService {
             while ((linea = reader.readLine()) != null) {
                 fila++;
                 String[] cols = linea.split(",", -1);
+
+                // 7 columnas = formato antiguo (sin track_id); 8 = nuevo
+                boolean formatoNuevo = cols.length >= 8;
                 if (cols.length < 7) {
                     log.warn("CSV fila {} inválida (columnas insuficientes), se omite: {}", fila, linea);
                     continue;
@@ -57,12 +62,26 @@ public class CsvParserService {
                 try {
                     int frameNumero = Integer.parseInt(cols[1].trim());
                     Long idZona = resolverIdZona(cols[2].trim(), mapaZonas);
-                    double x = Double.parseDouble(cols[3].trim());
-                    double y = Double.parseDouble(cols[4].trim());
-                    double conf = Double.parseDouble(cols[5].trim());
-                    boolean detenida = Boolean.parseBoolean(cols[6].trim());
 
-                    lote.add(new Object[]{video.getId(), idZona, frameNumero, x, y, conf, detenida});
+                    int trackId;
+                    double x, y, conf;
+                    boolean detenida;
+
+                    if (formatoNuevo) {
+                        trackId = Integer.parseInt(cols[3].trim());
+                        x       = Double.parseDouble(cols[4].trim());
+                        y       = Double.parseDouble(cols[5].trim());
+                        conf    = Double.parseDouble(cols[6].trim());
+                        detenida = Boolean.parseBoolean(cols[7].trim());
+                    } else {
+                        trackId = -1;
+                        x       = Double.parseDouble(cols[3].trim());
+                        y       = Double.parseDouble(cols[4].trim());
+                        conf    = Double.parseDouble(cols[5].trim());
+                        detenida = Boolean.parseBoolean(cols[6].trim());
+                    }
+
+                    lote.add(new Object[]{video.getId(), idZona, frameNumero, x, y, conf, detenida, trackId});
                 } catch (NumberFormatException e) {
                     log.warn("CSV fila {} con valor no parseable, se omite: {}", fila, linea);
                     continue;

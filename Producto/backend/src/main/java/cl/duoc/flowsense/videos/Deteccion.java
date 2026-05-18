@@ -39,4 +39,10 @@ public class Deteccion {
 
     @Column(nullable = false, precision = 4, scale = 3)
     private BigDecimal confianza;
+
+    @Column(nullable = false)
+    private Boolean detenida;
+
+    @Column(name = "track_id", nullable = false)
+    private Integer trackId;
 }

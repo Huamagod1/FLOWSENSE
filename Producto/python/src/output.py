@@ -2,7 +2,8 @@ import csv
 import json
 import sys
 
-_CABECERA = ["id_video", "frame_numero", "zona_id", "x_centro_norm", "y_centro_norm", "confianza", "detenida"]
+_CABECERA = ["id_video", "frame_numero", "zona_id", "track_id",
+             "x_centro_norm", "y_centro_norm", "confianza", "detenida"]
 
 
 def abrir_csv(ruta):
@@ -13,9 +14,9 @@ def abrir_csv(ruta):
     return f, writer
 
 
-def escribir_deteccion(writer, id_video, frame_num, zona_id, x, y, conf, detenida):
+def escribir_deteccion(writer, id_video, frame_num, zona_id, track_id, x, y, conf, detenida):
     writer.writerow([
-        id_video, frame_num, zona_id,
+        id_video, frame_num, zona_id, track_id,
         round(x, 6), round(y, 6), round(conf, 4),
         "true" if detenida else "false",
     ])
@@ -23,7 +24,11 @@ def escribir_deteccion(writer, id_video, frame_num, zona_id, x, y, conf, detenid
 
 def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
                      aborted_by_user=False, detecciones_detenidas=0,
-                     tasa_detencion_global=0.0, modelo_usado=""):
+                     tasa_detencion_global=0.0, modelo_usado="",
+                     personas_unicas_total=None,
+                     tiempo_permanencia_promedio_global=None,
+                     flujo_entre_zonas=None,
+                     metricas_por_zona=None):
     """Imprime en stdout la línea JSON que Spring Boot captura al terminar el proceso."""
     resumen = {
         "frames_procesados": frames,
@@ -34,6 +39,14 @@ def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
         "modelo_usado": modelo_usado,
         "status": status,
     }
+    if personas_unicas_total is not None:
+        resumen["personas_unicas_total"] = personas_unicas_total
+    if tiempo_permanencia_promedio_global is not None:
+        resumen["tiempo_permanencia_promedio_global"] = round(tiempo_permanencia_promedio_global, 2)
+    if flujo_entre_zonas is not None:
+        resumen["flujo_entre_zonas"] = flujo_entre_zonas
+    if metricas_por_zona is not None:
+        resumen["metricas_por_zona"] = metricas_por_zona
     if mensaje is not None:
         resumen["mensaje"] = mensaje
     if aborted_by_user:

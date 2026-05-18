@@ -5,15 +5,19 @@ import cl.duoc.flowsense.recintos.ZonaService;
 import cl.duoc.flowsense.recintos.dto.ZonaRequest;
 import cl.duoc.flowsense.recintos.dto.ZonaResponse;
 import cl.duoc.flowsense.recintos.dto.ZonasGuardarRequest;
+import cl.duoc.flowsense.procesamiento.TrackingMetricsService;
 import cl.duoc.flowsense.videos.dto.DeteccionHeatmapPoint;
 import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
+import cl.duoc.flowsense.videos.dto.FlujoZonasDto;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
 import cl.duoc.flowsense.videos.dto.GuardarZonasYProcesarRequest;
 import cl.duoc.flowsense.videos.dto.MetricaResponse;
 import cl.duoc.flowsense.videos.dto.MetricaTemporalResponse;
+import cl.duoc.flowsense.videos.dto.MetricaTrackingResponse;
 import cl.duoc.flowsense.videos.dto.PrecioSugeridoRequest;
 import cl.duoc.flowsense.videos.dto.PrecioSugeridoZona;
 import cl.duoc.flowsense.videos.dto.ResumenAnalisisResponse;
+import cl.duoc.flowsense.videos.dto.TrackDto;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -29,15 +33,18 @@ public class VideoQueryController {
     private final VideoService videoService;
     private final AnalisisService analisisService;
     private final ZonaService zonaService;
+    private final TrackingMetricsService trackingMetricsService;
     private final CurrentUser currentUser;
 
     public VideoQueryController(VideoService videoService,
                                 AnalisisService analisisService,
                                 ZonaService zonaService,
+                                TrackingMetricsService trackingMetricsService,
                                 CurrentUser currentUser) {
         this.videoService = videoService;
         this.analisisService = analisisService;
         this.zonaService = zonaService;
+        this.trackingMetricsService = trackingMetricsService;
         this.currentUser = currentUser;
     }
 
@@ -135,6 +142,26 @@ public class VideoQueryController {
     public ResponseEntity<List<MetricaTemporalResponse>> metricasTemporales(@PathVariable Long id) {
         return ResponseEntity.ok(
                 analisisService.obtenerMetricasTemporales(id, currentUser.getIdOrganizacion()));
+    }
+
+    // ── Tracking ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/tracks")
+    public ResponseEntity<List<TrackDto>> tracks(@PathVariable Long id) {
+        videoService.obtener(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.ok(trackingMetricsService.listarTracks(id));
+    }
+
+    @GetMapping("/{id}/flujo-zonas")
+    public ResponseEntity<List<FlujoZonasDto>> flujoZonas(@PathVariable Long id) {
+        videoService.obtener(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.ok(trackingMetricsService.listarFlujoZonas(id));
+    }
+
+    @GetMapping("/{id}/metricas-tracking")
+    public ResponseEntity<List<MetricaTrackingResponse>> metricasTracking(@PathVariable Long id) {
+        videoService.obtener(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.ok(trackingMetricsService.listarMetricasTracking(id));
     }
 
     @PostMapping("/{id}/precio-sugerido")

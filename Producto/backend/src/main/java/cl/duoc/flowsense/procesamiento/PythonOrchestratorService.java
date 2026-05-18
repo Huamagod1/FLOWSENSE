@@ -154,7 +154,8 @@ public class PythonOrchestratorService {
                 "--output", csvOutput.toAbsolutePath().toString(),
                 "--conf", conf,
                 "--modelo", modelo,
-                "--fps", "1"
+                "--fps", "1",
+                "--tracker", "bytetrack"
         );
 
         log.info("Iniciando detección completa video {}: {}", video.getId(), String.join(" ", comando));
@@ -203,6 +204,7 @@ public class PythonOrchestratorService {
         Integer framesProcesados = null;
         Integer deteccionesTotales = null;
         Integer duracionSeg = null;
+        TrackingData trackingData = null;
 
         for (String line : outputLines) {
             String trimmed = line.trim();
@@ -215,6 +217,7 @@ public class PythonOrchestratorService {
                     if (node.has("frames_procesados")) framesProcesados = node.get("frames_procesados").asInt();
                     if (node.has("detecciones_totales")) deteccionesTotales = node.get("detecciones_totales").asInt();
                     if (node.has("duracion_seg")) duracionSeg = node.get("duracion_seg").asInt();
+                    trackingData = parsearTrackingData(node);
                     break;
                 } catch (ProcesamientoException pe) {
                     throw pe;
@@ -226,7 +229,47 @@ public class PythonOrchestratorService {
 
         log.info("Detección completa para video {}: {} frames, {} detecciones",
                 video.getId(), framesProcesados, deteccionesTotales);
-        return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, csvOutput, mapaZonas);
+        return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, csvOutput, mapaZonas,
+                trackingData);
+    }
+
+    private TrackingData parsearTrackingData(JsonNode node) {
+        if (!node.has("metricas_por_zona")) return null;
+
+        Integer personasUnicasTotal = node.has("personas_unicas_total")
+                ? node.get("personas_unicas_total").asInt() : null;
+        Double permanenciaGlobal = node.has("tiempo_permanencia_promedio_global")
+                ? node.get("tiempo_permanencia_promedio_global").asDouble() : null;
+
+        List<TrackingData.FlujoZona> flujoList = new ArrayList<>();
+        JsonNode flujoNode = node.path("flujo_entre_zonas");
+        if (flujoNode.isArray()) {
+            for (JsonNode f : flujoNode) {
+                flujoList.add(new TrackingData.FlujoZona(
+                        f.get("zona_origen").asInt(),
+                        f.get("zona_destino").asInt(),
+                        f.get("conteo").asInt()));
+            }
+        }
+
+        Map<Integer, TrackingData.ZoneMetrics> metricasPorZona = new java.util.LinkedHashMap<>();
+        JsonNode mpz = node.get("metricas_por_zona");
+        mpz.fields().forEachRemaining(entry -> {
+            int pyZoneIdx = Integer.parseInt(entry.getKey());
+            JsonNode zm = entry.getValue();
+            Double velocidad = zm.has("velocidad_flujo_promedio")
+                    ? zm.get("velocidad_flujo_promedio").asDouble() : null;
+            metricasPorZona.put(pyZoneIdx, new TrackingData.ZoneMetrics(
+                    zm.path("personas_unicas").asInt(0),
+                    zm.path("tiempo_permanencia_promedio").asDouble(0.0),
+                    zm.path("entradas").asInt(0),
+                    zm.path("salidas").asInt(0),
+                    zm.path("ots_tracking").asDouble(0.0),
+                    velocidad
+            ));
+        });
+
+        return new TrackingData(personasUnicasTotal, permanenciaGlobal, flujoList, metricasPorZona);
     }
 
     private Map<Integer, Long> generarZonasJson(Long idVideo, List<Zona> zonas, Path destino) {

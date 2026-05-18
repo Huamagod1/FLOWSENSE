@@ -28,7 +28,9 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 RUN pip install --no-cache-dir \
     ultralytics==8.3.* \
     opencv-python-headless==4.10.* \
-    numpy==1.26.*
+    numpy==1.26.* \
+    "pandas>=2.0,<3.0" \
+    "lapx>=0.5.5"
 
 WORKDIR /app
 

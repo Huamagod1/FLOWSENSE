@@ -58,7 +58,7 @@ def main():
     zonas = datos_zonas["zonas"]
 
     try:
-        detector = Detector(args.conf, args.iou, args.imgsz, args.modelo)
+        detector = Detector(args.conf, args.iou, args.imgsz, args.modelo, tracker=args.tracker)
     except Exception as e:
         imprimir_resumen(0, 0, 0, status="ERROR",
                          mensaje=f"Error al cargar modelo YOLOv8: {e}")
@@ -127,6 +127,7 @@ def main():
                 todas_detecciones.append({
                     "frame_numero": frame_num,
                     "zona_id": zona_id,
+                    "track_id": det.get("track_id", -1),
                     "x_centro_norm": det["x_centro_norm"],
                     "y_centro_norm": det["y_centro_norm"],
                     "confianza": det["confianza"],
@@ -158,10 +159,11 @@ def main():
         from src.deteccion_movimiento import calcular_detenidas
         todas_detecciones = calcular_detenidas(todas_detecciones)
 
-        # Escribir CSV con columna detenida
+        # Escribir CSV con columnas track_id y detenida
         for d in todas_detecciones:
             escribir_deteccion(
                 writer, id_video, d["frame_numero"], d["zona_id"],
+                d.get("track_id", -1),
                 d["x_centro_norm"], d["y_centro_norm"], d["confianza"],
                 d["detenida"],
             )
@@ -171,12 +173,51 @@ def main():
     det_detenidas = sum(1 for d in todas_detecciones if d.get("detenida", False))
     tasa = det_detenidas / detecciones_totales if detecciones_totales > 0 else 0.0
 
+    # Métricas de tracking (solo si tracker activo y hay detecciones)
+    personas_unicas_total = None
+    permanencia_global = None
+    flujo_zonas = None
+    metricas_por_zona_json = None
+
+    if args.tracker != "none" and todas_detecciones:
+        import pandas as pd
+        from src.metricas_tracking import (
+            calcular_personas_unicas,
+            calcular_tiempo_permanencia_promedio,
+            calcular_flujo_entre_zonas,
+            calcular_entradas_salidas,
+            calcular_ots_tracking,
+            calcular_velocidad_flujo_promedio,
+        )
+        df = pd.DataFrame(todas_detecciones)
+        personas_unicas_total = int(df[df["track_id"] != -1]["track_id"].nunique())
+        permanencia_global = calcular_tiempo_permanencia_promedio(df)
+        flujo_zonas = calcular_flujo_entre_zonas(df)
+
+        metricas_por_zona_json = {}
+        for zona in zonas:
+            zid = zona["id"]
+            df_z = df[df["zona_id"] == zid]
+            es = calcular_entradas_salidas(df, zid)
+            metricas_por_zona_json[str(zid)] = {
+                "personas_unicas": calcular_personas_unicas(df_z),
+                "tiempo_permanencia_promedio": round(calcular_tiempo_permanencia_promedio(df_z), 2),
+                "entradas": es["entradas"],
+                "salidas": es["salidas"],
+                "ots_tracking": calcular_ots_tracking(df_z),
+                "velocidad_flujo_promedio": round(calcular_velocidad_flujo_promedio(df_z), 6),
+            }
+
     imprimir_resumen(
         frames_procesados, detecciones_totales, duracion,
         aborted_by_user=aborted_by_user,
         detecciones_detenidas=det_detenidas,
         tasa_detencion_global=tasa,
         modelo_usado=args.modelo,
+        personas_unicas_total=personas_unicas_total,
+        tiempo_permanencia_promedio_global=permanencia_global,
+        flujo_entre_zonas=flujo_zonas,
+        metricas_por_zona=metricas_por_zona_json,
     )
 
 
