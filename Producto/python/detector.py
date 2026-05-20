@@ -173,14 +173,19 @@ def main():
     det_detenidas = sum(1 for d in todas_detecciones if d.get("detenida", False))
     tasa = det_detenidas / detecciones_totales if detecciones_totales > 0 else 0.0
 
+    # Construir DataFrame una sola vez; lo reutilizan tracking, confiabilidad y eventos
+    df_det = None
+    if todas_detecciones:
+        import pandas as pd
+        df_det = pd.DataFrame(todas_detecciones)
+
     # Métricas de tracking (solo si tracker activo y hay detecciones)
     personas_unicas_total = None
     permanencia_global = None
     flujo_zonas = None
     metricas_por_zona_json = None
 
-    if args.tracker != "none" and todas_detecciones:
-        import pandas as pd
+    if args.tracker != "none" and df_det is not None:
         from src.metricas_tracking import (
             calcular_personas_unicas,
             calcular_tiempo_permanencia_promedio,
@@ -189,16 +194,15 @@ def main():
             calcular_ots_tracking,
             calcular_velocidad_flujo_promedio,
         )
-        df = pd.DataFrame(todas_detecciones)
-        personas_unicas_total = int(df[df["track_id"] != -1]["track_id"].nunique())
-        permanencia_global = calcular_tiempo_permanencia_promedio(df)
-        flujo_zonas = calcular_flujo_entre_zonas(df)
+        personas_unicas_total = int(df_det[df_det["track_id"] != -1]["track_id"].nunique())
+        permanencia_global = calcular_tiempo_permanencia_promedio(df_det)
+        flujo_zonas = calcular_flujo_entre_zonas(df_det)
 
         metricas_por_zona_json = {}
         for zona in zonas:
             zid = zona["id"]
-            df_z = df[df["zona_id"] == zid]
-            es = calcular_entradas_salidas(df, zid)
+            df_z = df_det[df_det["zona_id"] == zid]
+            es = calcular_entradas_salidas(df_det, zid)
             metricas_por_zona_json[str(zid)] = {
                 "personas_unicas": calcular_personas_unicas(df_z),
                 "tiempo_permanencia_promedio": round(calcular_tiempo_permanencia_promedio(df_z), 2),
@@ -207,6 +211,38 @@ def main():
                 "ots_tracking": calcular_ots_tracking(df_z),
                 "velocidad_flujo_promedio": round(calcular_velocidad_flujo_promedio(df_z), 6),
             }
+
+    # Confiabilidad, eventos y video overlay
+    video_overlay_path = None
+    confiabilidad_resumen = None
+    eventos_count = 0
+
+    if df_det is not None:
+        from src.confiabilidad import generar_resumen_confiabilidad
+        confiabilidad_resumen = generar_resumen_confiabilidad(df_det, frames_procesados)
+
+        from src.eventos import generar_eventos
+        _eventos_lista = generar_eventos(df_det, zonas, fps_video=fps_video)
+        eventos_count = len(_eventos_lista)
+
+        _eventos_path = args.output.rsplit(".", 1)[0] + "_eventos.json"
+        with open(_eventos_path, "w", encoding="utf-8") as _ef:
+            json.dump(_eventos_lista, _ef)
+
+        try:
+            from src.video_overlay import generar_video_overlay
+            _overlay_path = args.output.rsplit(".", 1)[0] + "_overlay.mp4"
+            generar_video_overlay(
+                video_input=args.video,
+                csv_detecciones=args.output,
+                zonas_json=args.zonas,
+                video_output=_overlay_path,
+                trail_length=15,
+            )
+            video_overlay_path = _overlay_path
+        except Exception as _e:
+            import traceback as _tb
+            print(f"[WARN] No se pudo generar video overlay: {_e}", file=sys.stderr)
 
     imprimir_resumen(
         frames_procesados, detecciones_totales, duracion,
@@ -218,6 +254,9 @@ def main():
         tiempo_permanencia_promedio_global=permanencia_global,
         flujo_entre_zonas=flujo_zonas,
         metricas_por_zona=metricas_por_zona_json,
+        video_overlay_path=video_overlay_path,
+        confiabilidad=confiabilidad_resumen,
+        eventos_count=eventos_count,
     )
 
 

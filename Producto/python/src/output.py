@@ -28,7 +28,10 @@ def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
                      personas_unicas_total=None,
                      tiempo_permanencia_promedio_global=None,
                      flujo_entre_zonas=None,
-                     metricas_por_zona=None):
+                     metricas_por_zona=None,
+                     video_overlay_path=None,
+                     confiabilidad=None,
+                     eventos_count=0):
     """Imprime en stdout la línea JSON que Spring Boot captura al terminar el proceso."""
     resumen = {
         "frames_procesados": frames,
@@ -47,6 +50,12 @@ def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
         resumen["flujo_entre_zonas"] = flujo_entre_zonas
     if metricas_por_zona is not None:
         resumen["metricas_por_zona"] = metricas_por_zona
+    if video_overlay_path is not None:
+        resumen["video_overlay_path"] = video_overlay_path
+    if confiabilidad is not None:
+        resumen["confiabilidad"] = confiabilidad
+    if eventos_count:
+        resumen["eventos_count"] = eventos_count
     if mensaje is not None:
         resumen["mensaje"] = mensaje
     if aborted_by_user:
