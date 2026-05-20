@@ -5,13 +5,20 @@ import cl.duoc.flowsense.common.exceptions.RecursoNoEncontradoException;
 import cl.duoc.flowsense.common.exceptions.ValidacionException;
 import cl.duoc.flowsense.recintos.Recinto;
 import cl.duoc.flowsense.recintos.RecintoRepository;
+import cl.duoc.flowsense.videos.dto.ConfiabilidadResponse;
 import cl.duoc.flowsense.videos.dto.DeteccionHeatmapPoint;
 import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
+import cl.duoc.flowsense.videos.dto.EventoDto;
+import cl.duoc.flowsense.videos.dto.EventosResponse;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,17 +40,20 @@ public class VideoService {
     private final RecintoRepository recintoRepository;
     private final DeteccionRepository deteccionRepository;
     private final VideoAsyncProcessor asyncProcessor;
+    private final ObjectMapper objectMapper;
     private final String uploadDir;
 
     public VideoService(VideoRepository videoRepository,
                         RecintoRepository recintoRepository,
                         DeteccionRepository deteccionRepository,
                         VideoAsyncProcessor asyncProcessor,
+                        ObjectMapper objectMapper,
                         @Value("${app.upload-dir}") String uploadDir) {
         this.videoRepository = videoRepository;
         this.recintoRepository = recintoRepository;
         this.deteccionRepository = deteccionRepository;
         this.asyncProcessor = asyncProcessor;
+        this.objectMapper = objectMapper;
         this.uploadDir = uploadDir;
     }
 
@@ -196,6 +207,105 @@ public class VideoService {
         } catch (IOException e) {
             throw new ValidacionException("Error leyendo el frame: " + e.getMessage());
         }
+    }
+
+    @Transactional(readOnly = true)
+    public ConfiabilidadResponse obtenerConfiabilidad(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+        return ConfiabilidadResponse.builder()
+                .confianzaPromedio(video.getConfianzaPromedio())
+                .calidadTracking(video.getCalidadTracking())
+                .scoreConfiabilidad(video.getScoreConfiabilidad())
+                .nivelConfiabilidad(video.getNivelConfiabilidad())
+                .overlayDisponible(video.getVideoOverlayPath() != null)
+                .videoOriginalDisponible(video.getVideoOriginalDisponible())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Resource servirVideoOverlay(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+        if (video.getVideoOverlayPath() == null) {
+            throw new RecursoNoEncontradoException("Video con overlay no disponible para este análisis");
+        }
+        Path overlayPath = Paths.get(video.getVideoOverlayPath());
+        if (!Files.exists(overlayPath)) {
+            throw new RecursoNoEncontradoException("Archivo de overlay no encontrado en disco");
+        }
+        return new FileSystemResource(overlayPath);
+    }
+
+    @Transactional(readOnly = true)
+    public EventosResponse obtenerEventos(Long idVideo, Long idOrg, Integer desde, Integer hasta) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+        if (video.getEventosJsonPath() == null) {
+            throw new RecursoNoEncontradoException("Eventos no disponibles para este análisis");
+        }
+        Path jsonPath = Paths.get(video.getEventosJsonPath());
+        if (!Files.exists(jsonPath)) {
+            throw new RecursoNoEncontradoException("Archivo de eventos no encontrado en disco");
+        }
+
+        List<EventoDto> todos = new ArrayList<>();
+        try {
+            JsonNode array = objectMapper.readTree(jsonPath.toFile());
+            for (JsonNode item : array) {
+                todos.add(new EventoDto(
+                        item.path("tiempo").asDouble(),
+                        item.path("frame").asInt(),
+                        item.path("track_id").asInt(),
+                        item.path("tipo").asText(),
+                        item.path("zona_id").asInt(),
+                        item.path("confianza").asDouble(),
+                        item.path("x_norm").asDouble(),
+                        item.path("y_norm").asDouble()
+                ));
+            }
+        } catch (IOException e) {
+            throw new ValidacionException("Error leyendo el archivo de eventos: " + e.getMessage());
+        }
+
+        List<EventoDto> filtrados = todos;
+        if (desde != null || hasta != null) {
+            int d = desde != null ? desde : 0;
+            int h = hasta != null ? hasta : Integer.MAX_VALUE;
+            filtrados = todos.stream()
+                    .filter(e -> e.frame() >= d && e.frame() <= h)
+                    .toList();
+        }
+
+        // si no hay filtro de rango, devolver primeros 100; siempre máximo 500
+        List<EventoDto> pagina = filtrados.stream()
+                .limit((desde == null && hasta == null) ? 100 : 500)
+                .toList();
+
+        return EventosResponse.builder()
+                .eventos(pagina)
+                .total(filtrados.size())
+                .desde(desde)
+                .hasta(hasta)
+                .build();
+    }
+
+    @Transactional
+    public void eliminarVideoOriginal(Long idVideo, Long idOrg) {
+        Video video = videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+        if (video.getEstado() == EstadoVideo.PROCESANDO) {
+            throw new ConflictException("No se puede eliminar el video mientras está siendo procesado");
+        }
+        borrarSilencioso(Paths.get(video.getRutaArchivo()));
+        if (video.getVideoOverlayPath() != null) {
+            borrarSilencioso(Paths.get(video.getVideoOverlayPath()));
+        }
+        video.setVideoOriginalDisponible(false);
+        video.setVideoOverlayPath(null);
+        video.setEventosJsonPath(null);
+        videoRepository.save(video);
+        log.info("Video original y overlay eliminados para video {} (org {})", idVideo, idOrg);
     }
 
     private void validarArchivo(MultipartFile archivo) {

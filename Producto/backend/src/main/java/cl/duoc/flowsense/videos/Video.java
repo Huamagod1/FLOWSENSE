@@ -59,6 +59,28 @@ public class Video {
     @Column(name = "modelo_usado", length = 20)
     private String modeloUsado;
 
+    @Column(name = "confianza_promedio")
+    private Double confianzaPromedio;
+
+    @Column(name = "calidad_tracking")
+    private Double calidadTracking;
+
+    @Column(name = "score_confiabilidad")
+    private Double scoreConfiabilidad;
+
+    @Column(name = "nivel_confiabilidad", length = 10)
+    private String nivelConfiabilidad;
+
+    @Column(name = "video_overlay_path", length = 500)
+    private String videoOverlayPath;
+
+    @Column(name = "eventos_json_path", length = 500)
+    private String eventosJsonPath;
+
+    @Builder.Default
+    @Column(name = "video_original_disponible", nullable = false)
+    private Boolean videoOriginalDisponible = true;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default

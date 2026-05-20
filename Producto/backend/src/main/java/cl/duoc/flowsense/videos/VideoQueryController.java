@@ -6,8 +6,10 @@ import cl.duoc.flowsense.recintos.dto.ZonaRequest;
 import cl.duoc.flowsense.recintos.dto.ZonaResponse;
 import cl.duoc.flowsense.recintos.dto.ZonasGuardarRequest;
 import cl.duoc.flowsense.procesamiento.TrackingMetricsService;
+import cl.duoc.flowsense.videos.dto.ConfiabilidadResponse;
 import cl.duoc.flowsense.videos.dto.DeteccionHeatmapPoint;
 import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
+import cl.duoc.flowsense.videos.dto.EventosResponse;
 import cl.duoc.flowsense.videos.dto.FlujoZonasDto;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
 import cl.duoc.flowsense.videos.dto.GuardarZonasYProcesarRequest;
@@ -20,6 +22,8 @@ import cl.duoc.flowsense.videos.dto.ResumenAnalisisResponse;
 import cl.duoc.flowsense.videos.dto.TrackDto;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -171,5 +175,36 @@ public class VideoQueryController {
         return ResponseEntity.ok(
                 analisisService.calcularPrecioSugeridoConScore(
                         id, currentUser.getIdOrganizacion(), request.getPrecioBase()));
+    }
+
+    // ── Validación del análisis ───────────────────────────────────────────────
+
+    @GetMapping("/{id}/confiabilidad")
+    public ResponseEntity<ConfiabilidadResponse> confiabilidad(@PathVariable Long id) {
+        return ResponseEntity.ok(videoService.obtenerConfiabilidad(id, currentUser.getIdOrganizacion()));
+    }
+
+    @GetMapping("/{id}/video-overlay")
+    public ResponseEntity<Resource> videoOverlay(@PathVariable Long id) {
+        Resource resource = videoService.servirVideoOverlay(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("video/mp4"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"overlay.mp4\"")
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/eventos")
+    public ResponseEntity<EventosResponse> eventos(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer desde,
+            @RequestParam(required = false) Integer hasta) {
+        return ResponseEntity.ok(
+                videoService.obtenerEventos(id, currentUser.getIdOrganizacion(), desde, hasta));
+    }
+
+    @DeleteMapping("/{id}/video-original")
+    public ResponseEntity<Void> eliminarVideoOriginal(@PathVariable Long id) {
+        videoService.eliminarVideoOriginal(id, currentUser.getIdOrganizacion());
+        return ResponseEntity.noContent().build();
     }
 }

@@ -9,5 +9,6 @@ public record DeteccionResult(
         Integer duracionSeg,
         Path csvPath,
         Map<Integer, Long> mapaZonas,
-        TrackingData trackingData
+        TrackingData trackingData,
+        ConfiabilidadData confiabilidadData
 ) {}

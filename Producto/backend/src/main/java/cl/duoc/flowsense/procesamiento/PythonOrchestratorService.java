@@ -205,6 +205,7 @@ public class PythonOrchestratorService {
         Integer deteccionesTotales = null;
         Integer duracionSeg = null;
         TrackingData trackingData = null;
+        ConfiabilidadData confiabilidadData = null;
 
         for (String line : outputLines) {
             String trimmed = line.trim();
@@ -218,6 +219,7 @@ public class PythonOrchestratorService {
                     if (node.has("detecciones_totales")) deteccionesTotales = node.get("detecciones_totales").asInt();
                     if (node.has("duracion_seg")) duracionSeg = node.get("duracion_seg").asInt();
                     trackingData = parsearTrackingData(node);
+                    confiabilidadData = parsearConfiabilidad(node);
                     break;
                 } catch (ProcesamientoException pe) {
                     throw pe;
@@ -230,7 +232,7 @@ public class PythonOrchestratorService {
         log.info("Detección completa para video {}: {} frames, {} detecciones",
                 video.getId(), framesProcesados, deteccionesTotales);
         return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, csvOutput, mapaZonas,
-                trackingData);
+                trackingData, confiabilidadData);
     }
 
     private TrackingData parsearTrackingData(JsonNode node) {
@@ -270,6 +272,24 @@ public class PythonOrchestratorService {
         });
 
         return new TrackingData(personasUnicasTotal, permanenciaGlobal, flujoList, metricasPorZona);
+    }
+
+    private ConfiabilidadData parsearConfiabilidad(JsonNode node) {
+        JsonNode conf = node.path("confiabilidad");
+        String overlayPath = node.has("video_overlay_path")
+                ? node.get("video_overlay_path").asText(null) : null;
+        if (conf.isMissingNode() && overlayPath == null) return null;
+
+        Double confianza = conf.has("confianza_promedio") ? conf.get("confianza_promedio").asDouble() : null;
+        Double calidad   = conf.has("calidad_tracking")  ? conf.get("calidad_tracking").asDouble()  : null;
+        Double score     = conf.has("score_global")      ? conf.get("score_global").asDouble()      : null;
+        String nivel     = conf.has("nivel")             ? conf.get("nivel").asText(null)           : null;
+
+        // eventos JSON es co-ubicado con el overlay: misma ruta, extensión distinta
+        String eventosPath = (overlayPath != null)
+                ? overlayPath.replace("_overlay.mp4", "_eventos.json") : null;
+
+        return new ConfiabilidadData(confianza, calidad, score, nivel, overlayPath, eventosPath);
     }
 
     private Map<Integer, Long> generarZonasJson(Long idVideo, List<Zona> zonas, Path destino) {

@@ -1,0 +1,55 @@
+-- V11: Agrega columnas de confiabilidad, paths de overlay/eventos y flag de
+-- disponibilidad del video original a VIDEOS.
+-- Idempotente: usa INFORMATION_SCHEMA para no fallar si alguna columna
+-- ya existiera en la BD de desarrollo.
+
+SET @db = DATABASE();
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN confianza_promedio DOUBLE NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'confianza_promedio');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN calidad_tracking DOUBLE NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'calidad_tracking');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN score_confiabilidad DOUBLE NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'score_confiabilidad');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN nivel_confiabilidad VARCHAR(10) NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'nivel_confiabilidad');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN video_overlay_path VARCHAR(500) NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'video_overlay_path');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN eventos_json_path VARCHAR(500) NULL',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'eventos_json_path');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @q = (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE VIDEOS ADD COLUMN video_original_disponible TINYINT(1) NOT NULL DEFAULT 1',
+    'DO 0')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'VIDEOS' AND COLUMN_NAME = 'video_original_disponible');
+PREPARE s FROM @q; EXECUTE s; DEALLOCATE PREPARE s;

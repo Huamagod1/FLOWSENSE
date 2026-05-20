@@ -1,5 +1,6 @@
 package cl.duoc.flowsense.videos;
 
+import cl.duoc.flowsense.procesamiento.ConfiabilidadData;
 import cl.duoc.flowsense.procesamiento.CsvParserService;
 import cl.duoc.flowsense.procesamiento.DeteccionResult;
 import cl.duoc.flowsense.procesamiento.FrameExtractionResult;
@@ -118,6 +119,16 @@ public class VideoAsyncProcessor {
 
             if (resultado.trackingData() != null) {
                 trackingMetricsService.persistirTracking(video, resultado.mapaZonas(), resultado.trackingData());
+            }
+
+            if (resultado.confiabilidadData() != null) {
+                ConfiabilidadData cd = resultado.confiabilidadData();
+                video.setConfianzaPromedio(cd.confianzaPromedio());
+                video.setCalidadTracking(cd.calidadTracking());
+                video.setScoreConfiabilidad(cd.scoreConfiabilidad());
+                video.setNivelConfiabilidad(cd.nivelConfiabilidad());
+                video.setVideoOverlayPath(cd.videoOverlayPath());
+                video.setEventosJsonPath(cd.eventosJsonPath());
             }
 
             video.setEstado(EstadoVideo.COMPLETADO);

@@ -24,6 +24,8 @@ public class VideoResponse {
     private String mensajeError;
     private LocalDateTime fechaSubida;
     private LocalDateTime fechaActualizacion;
+    private Boolean videoOriginalDisponible;
+    private Boolean overlayDisponible;
 
     public static VideoResponse from(Video video) {
         return VideoResponse.builder()
@@ -40,6 +42,8 @@ public class VideoResponse {
                 .mensajeError(video.getMensajeError())
                 .fechaSubida(video.getFechaSubida())
                 .fechaActualizacion(video.getFechaActualizacion())
+                .videoOriginalDisponible(video.getVideoOriginalDisponible())
+                .overlayDisponible(video.getVideoOverlayPath() != null)
                 .build();
     }
 }
