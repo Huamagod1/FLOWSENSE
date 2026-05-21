@@ -13,7 +13,6 @@ from src.output import abrir_csv, escribir_deteccion, imprimir_resumen
 
 
 def main():
-    inicio = time.time()
     args = parsear_args()
 
     # ── Modo extraer-frame ────────────────────────────────────────────────────
@@ -72,6 +71,8 @@ def main():
 
     fps_video = cap.get(cv2.CAP_PROP_FPS) or 25.0
     frame_step = max(1, int(round(fps_video / args.fps)))
+    total_frames_video = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    duracion_video_seg = int(total_frames_video / fps_video) if fps_video > 0 else 0
 
     # Instanciar preview antes del loop; sale con exit 1 si no hay display
     preview_window = None
@@ -169,7 +170,6 @@ def main():
             )
         csv_file.close()
 
-    duracion = time.time() - inicio
     det_detenidas = sum(1 for d in todas_detecciones if d.get("detenida", False))
     tasa = det_detenidas / detecciones_totales if detecciones_totales > 0 else 0.0
 
@@ -245,7 +245,7 @@ def main():
             print(f"[WARN] No se pudo generar video overlay: {_e}", file=sys.stderr)
 
     imprimir_resumen(
-        frames_procesados, detecciones_totales, duracion,
+        frames_procesados, detecciones_totales, duracion_video_seg,
         aborted_by_user=aborted_by_user,
         detecciones_detenidas=det_detenidas,
         tasa_detencion_global=tasa,

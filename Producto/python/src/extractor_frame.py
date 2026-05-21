@@ -1,11 +1,7 @@
-import time
-
 import cv2
 
 
 def extraer_frame(video_path, output_path, segundo=5):
-    inicio = time.time()
-
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return {
@@ -13,6 +9,10 @@ def extraer_frame(video_path, output_path, segundo=5):
             "status": "ERROR",
             "mensaje": f"No se pudo abrir el video: {video_path}",
         }
+
+    fps_video = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    duracion_video_seg = int(total_frames / fps_video) if fps_video > 0 else 0
 
     cap.set(cv2.CAP_PROP_POS_MSEC, segundo * 1000)
     ret, frame = cap.read()
@@ -33,6 +33,6 @@ def extraer_frame(video_path, output_path, segundo=5):
         "ruta": output_path,
         "ancho": ancho,
         "alto": alto,
-        "duracion_seg": round(time.time() - inicio, 2),
+        "duracion_seg": duracion_video_seg,
         "status": "OK",
     }

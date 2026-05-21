@@ -22,7 +22,7 @@ def escribir_deteccion(writer, id_video, frame_num, zona_id, track_id, x, y, con
     ])
 
 
-def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
+def imprimir_resumen(frames, detecciones, duracion_video_seg, status="OK", mensaje=None,
                      aborted_by_user=False, detecciones_detenidas=0,
                      tasa_detencion_global=0.0, modelo_usado="",
                      personas_unicas_total=None,
@@ -38,7 +38,7 @@ def imprimir_resumen(frames, detecciones, duracion, status="OK", mensaje=None,
         "detecciones_totales": detecciones,
         "detecciones_detenidas": detecciones_detenidas,
         "tasa_detencion_global": round(tasa_detencion_global, 3),
-        "duracion_seg": round(duracion, 2),
+        "duracion_seg": int(duracion_video_seg),
         "modelo_usado": modelo_usado,
         "status": status,
     }

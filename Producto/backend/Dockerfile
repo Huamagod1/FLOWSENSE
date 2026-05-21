@@ -30,7 +30,9 @@ RUN pip install --no-cache-dir \
     opencv-python-headless==4.10.* \
     numpy==1.26.* \
     "pandas>=2.0,<3.0" \
-    "lapx>=0.5.5"
+    "lapx>=0.5.5" \
+    "imageio[ffmpeg]>=2.31.0" \
+    "imageio-ffmpeg>=0.4.9"
 
 WORKDIR /app
 

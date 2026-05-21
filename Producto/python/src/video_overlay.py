@@ -103,11 +103,31 @@ def generar_video_overlay(
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps_salida = min(float(fps_video), 24.0)
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    # Intentar H.264 (avc1) para compatibilidad HTML5; fallback imageio/libx264
+    use_imageio = False
+    writer = None
+    imageio_writer = None
+
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
     writer = cv2.VideoWriter(video_output, fourcc, fps_salida, (w, h))
     if not writer.isOpened():
-        cap.release()
-        raise ValueError(f"No se pudo crear VideoWriter en: {video_output}")
+        writer.release()
+        writer = None
+        try:
+            import imageio
+            imageio_writer = imageio.get_writer(
+                video_output,
+                fps=fps_salida,
+                codec="libx264",
+                quality=None,
+                ffmpeg_params=["-crf", "23", "-preset", "fast", "-pix_fmt", "yuv420p"],
+            )
+            use_imageio = True
+        except Exception as e_io:
+            cap.release()
+            raise ValueError(
+                f"No se pudo crear VideoWriter (avc1 ni imageio): {e_io}"
+            ) from e_io
 
     historiales: dict = defaultdict(lambda: deque(maxlen=trail_length))
     frames_escritos = 0
@@ -154,13 +174,19 @@ def generar_video_overlay(
                 cv2.putText(frame, label, (rx1, max(12, ry1 - 4)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
 
-            writer.write(frame)
+            if use_imageio:
+                imageio_writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            else:
+                writer.write(frame)
             frames_escritos += 1
             frame_num += 1
 
     finally:
         cap.release()
-        writer.release()
+        if use_imageio:
+            imageio_writer.close()
+        elif writer is not None:
+            writer.release()
 
     tamaño = os.path.getsize(video_output) if os.path.exists(video_output) else 0
     return {
