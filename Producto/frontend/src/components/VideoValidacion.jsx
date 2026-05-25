@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Card, Progress, Table, Button, Spin } from 'antd'
+import { Card, Progress, Table, Button, Spin, Tooltip } from 'antd'
 import { fetchOverlayBlobUrl, getEventos, eliminarVideoOriginal } from '../api/validacion'
 
 const VENTANA_SEG = 5
+const TOLERANCIA_FRAME = 0.8
 
 const COLUMNAS_EVENTOS = [
   {
@@ -42,19 +43,31 @@ const COLUMNAS_EVENTOS = [
 
 const NIVEL_COLOR = { ALTO: '#16a34a', MEDIO: '#d97706', BAJO: '#dc2626' }
 
+const TEXTOS_NIVEL = {
+  ALTO: 'Análisis confiable. Los datos pueden usarse para tomar decisiones comerciales.',
+  MEDIO: 'Análisis con limitaciones menores. Recomendamos revisar visualmente algunas detecciones en la tab de Validación.',
+  BAJO: 'El video tiene condiciones difíciles. Los resultados deben usarse con cautela. Considera repetir el análisis con mejor calidad de video o ajustando las zonas.',
+}
+
+const TOOLTIPS_CONF = {
+  confianzaModelo: 'Probabilidad promedio que el modelo asigna a sus detecciones. Mayor a 70% se considera confiable. Menor a 50% indica condiciones difíciles del video (poca luz, ángulo poco favorable, mucho movimiento).',
+  calidadTracking: 'Porcentaje de personas que el sistema pudo seguir correctamente sin perderlas. Mayor a 80% indica que el conteo de personas únicas es confiable.',
+  scoreGlobal: 'Promedio ponderado de confianza y calidad. Determina el nivel general del análisis: ALTO (>80%), MEDIO (60-80%), BAJO (<60%).',
+}
+
 /**
  * Props:
  *   videoId      — id del video
  *   confiabilidad — objeto ConfiabilidadResponse del backend (puede ser null para videos legacy)
  */
 export default function VideoValidacion({ videoId, confiabilidad }) {
-  const [overlaySrc, setOverlaySrc]     = useState(null)
+  const [overlaySrc, setOverlaySrc]         = useState(null)
   const [overlayLoading, setOverlayLoading] = useState(true)
-  const [overlayError, setOverlayError] = useState(false)
-  const [eventos, setEventos]           = useState([])
-  const [currentTime, setCurrentTime]   = useState(0)
-  const [eliminando, setEliminando]     = useState(false)
-  const [eliminado, setEliminado]       = useState(false)
+  const [overlayError, setOverlayError]     = useState(false)
+  const [eventos, setEventos]               = useState([])
+  const [currentTime, setCurrentTime]       = useState(0)
+  const [eliminando, setEliminando]         = useState(false)
+  const [eliminado, setEliminado]           = useState(false)
   const videoRef = useRef()
 
   // ── Carga el overlay como blob URL (autenticado con JWT) ───────────────────
@@ -71,7 +84,7 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [videoId, confiabilidad?.overlayDisponible])
 
-  // ── Carga los primeros 500 eventos ─────────────────────────────────────────
+  // ── Carga todos los eventos ────────────────────────────────────────────────
   useEffect(() => {
     getEventos(videoId, 0, 999999)
       .then(r => setEventos(r.data?.eventos || []))
@@ -87,6 +100,31 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
     () => eventos.filter(e => Math.abs(e.tiempo - currentTime) <= VENTANA_SEG),
     [eventos, currentTime],
   )
+
+  // ── Eventos en el frame actual (tolerancia estricta) ──────────────────────
+  const eventosCurrent = useMemo(
+    () => eventosVentana.filter(e => Math.abs(e.tiempo - currentTime) <= TOLERANCIA_FRAME),
+    [eventosVentana, currentTime],
+  )
+
+  // ── Texto narrativo del momento actual ────────────────────────────────────
+  const narrativa = useMemo(() => {
+    const mm = Math.floor(currentTime / 60).toString().padStart(2, '0')
+    const ss = Math.floor(currentTime % 60).toString().padStart(2, '0')
+    const ts = `${mm}:${ss}`
+    const tracksActivos = new Set(eventosVentana.map(e => e.trackId)).size
+
+    if (eventosCurrent.length === 0) {
+      return `${ts} — ${tracksActivos} persona${tracksActivos !== 1 ? 's' : ''} activa${tracksActivos !== 1 ? 's' : ''} en ventana`
+    }
+    const acciones = eventosCurrent
+      .map(e => {
+        const verbo = e.tipo === 'ENTRADA' ? 'entró a' : e.tipo === 'SALIDA' ? 'salió de' : 'en'
+        return `Persona #${e.trackId} ${verbo} Zona ${e.zonaId}`
+      })
+      .join(' · ')
+    return `${ts} — ${acciones} · ${tracksActivos} activa${tracksActivos !== 1 ? 's' : ''}`
+  }, [eventosCurrent, eventosVentana, currentTime])
 
   const statsFrame = useMemo(() => ({
     detecciones: eventosVentana.length,
@@ -120,6 +158,7 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
   }
 
   const colorConf = NIVEL_COLOR[confiabilidad?.nivelConfiabilidad] || '#9ca3af'
+  const textoNivel = TEXTOS_NIVEL[confiabilidad?.nivelConfiabilidad]
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -231,17 +270,28 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
                   label="Confianza modelo"
                   value={confiabilidad.confianzaPromedio}
                   color={colorConf}
+                  tooltip={TOOLTIPS_CONF.confianzaModelo}
                 />
                 <ConfBar
                   label="Calidad tracking"
                   value={confiabilidad.calidadTracking}
                   color={colorConf}
+                  tooltip={TOOLTIPS_CONF.calidadTracking}
                 />
                 <ConfBar
                   label="Score global"
                   value={confiabilidad.scoreConfiabilidad}
                   color={colorConf}
+                  tooltip={TOOLTIPS_CONF.scoreGlobal}
                 />
+                {textoNivel && (
+                  <p style={{
+                    margin: '4px 0 0', fontSize: 11, color: '#6b7280',
+                    lineHeight: 1.5, borderTop: '1px solid #f3f4f6', paddingTop: 8,
+                  }}>
+                    {textoNivel}
+                  </p>
+                )}
               </div>
             </Card>
           ) : (
@@ -273,17 +323,48 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
             No hay datos de eventos para este análisis.
           </p>
         ) : (
-          <Table
-            dataSource={eventosVentana}
-            columns={COLUMNAS_EVENTOS}
-            rowKey={(_, i) => i}
-            pagination={false}
-            size="small"
-            scroll={{ y: 200 }}
-            locale={{
-              emptyText: 'No hay eventos en este momento. Avanza el reproductor para ver eventos.',
-            }}
-          />
+          <>
+            {/* Texto narrativo del momento actual */}
+            <div style={{
+              marginBottom: 10, padding: '6px 10px',
+              background: '#1e1b4b', borderRadius: 6,
+            }}>
+              <span style={{ fontSize: 11, color: '#e0e7ff', fontFamily: 'monospace' }}>
+                {narrativa}
+              </span>
+            </div>
+
+            {/* Tabla con highlight del frame actual y auto-scroll */}
+            <div>
+              <Table
+                dataSource={eventosVentana}
+                columns={COLUMNAS_EVENTOS}
+                rowKey={(_, i) => i}
+                pagination={false}
+                size="small"
+                scroll={{ y: 200 }}
+                rowClassName={(record) => {
+                  const diff = record.tiempo - currentTime
+                  return Math.abs(diff) <= TOLERANCIA_FRAME ? 'row-highlight-current' : ''
+                }}
+                onRow={(record) => {
+                  const diff = record.tiempo - currentTime
+                  const isCurrent = Math.abs(diff) <= TOLERANCIA_FRAME
+                  const isPast = diff < -TOLERANCIA_FRAME
+                  return {
+                    style: {
+                      background: isCurrent ? '#fef9c3' : undefined,
+                      opacity: isPast ? 0.5 : diff > TOLERANCIA_FRAME ? 0.35 : 1,
+                      transition: 'opacity 0.2s',
+                    },
+                  }
+                }}
+                locale={{
+                  emptyText: 'No hay eventos en este momento. Avanza el reproductor para ver eventos.',
+                }}
+              />
+            </div>
+          </>
         )}
       </Card>
 
@@ -308,12 +389,32 @@ function StatBox({ value, label, color, bg }) {
   )
 }
 
-function ConfBar({ label, value, color }) {
+function ConfBar({ label, value, color, tooltip }) {
   const pct = value != null ? Math.round(value * 100) : 0
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
-        <span style={{ color: '#6b7280' }}>{label}</span>
+        <span style={{ color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {label}
+          {tooltip && (
+            <Tooltip title={tooltip} placement="right">
+              <span style={{
+                cursor: 'help',
+                color: '#9ca3af',
+                fontSize: 9,
+                border: '1px solid #d1d5db',
+                borderRadius: '50%',
+                width: 13,
+                height: 13,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}>?</span>
+            </Tooltip>
+          )}
+        </span>
         <b>{value != null ? `${pct}%` : '—'}</b>
       </div>
       <Progress percent={pct} strokeColor={color} showInfo={false} size="small" />
