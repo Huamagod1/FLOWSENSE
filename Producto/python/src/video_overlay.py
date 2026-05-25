@@ -54,6 +54,94 @@ def _draw_trail(frame, points: list, color: tuple) -> None:
         cv2.line(frame, points[i - 1], points[i], faded, thickness)
 
 
+def interpolar_detecciones(df, total_frames: int, tiene_dims: bool) -> dict:
+    """
+    Retorna dict {frame_num: [{track_id, x, y, ancho, alto, confianza, opacity}]}.
+
+    Para tracks con id >= 0, interpola linealmente la posición entre frames
+    muestreados consecutivos y agrega un fade-out de 8 frames tras el último
+    avistamiento. Las detecciones sin track (id == -1) se pasan tal cual.
+    """
+    FADEOUT_FRAMES = 8
+    result: dict = defaultdict(list)
+
+    if "track_id" not in df.columns:
+        df = df.copy()
+        df["track_id"] = -1
+
+    # Detecciones sin tracking: agregar tal cual, sin interpolar
+    df_sin_track = df[df["track_id"] < 0]
+    for _, row in df_sin_track.iterrows():
+        result[int(row["frame_numero"])].append({
+            "track_id": -1,
+            "x": float(row["x_centro_norm"]),
+            "y": float(row["y_centro_norm"]),
+            "ancho": float(row["ancho_norm"]) if tiene_dims else 0.06,
+            "alto": float(row["alto_norm"]) if tiene_dims else 0.18,
+            "confianza": float(row["confianza"]),
+            "opacity": 1.0,
+        })
+
+    # Detecciones con tracking: interpolar entre frames muestreados
+    df_track = df[df["track_id"] >= 0]
+    for track_id, grupo in df_track.groupby("track_id"):
+        grupo_sorted = grupo.sort_values("frame_numero")
+        frames_list = sorted(int(f) for f in grupo_sorted["frame_numero"].tolist())
+
+        det_by_frame: dict = {}
+        for _, row in grupo_sorted.iterrows():
+            fn = int(row["frame_numero"])
+            det_by_frame[fn] = {
+                "track_id": int(track_id),
+                "x": float(row["x_centro_norm"]),
+                "y": float(row["y_centro_norm"]),
+                "ancho": float(row["ancho_norm"]) if tiene_dims else 0.06,
+                "alto": float(row["alto_norm"]) if tiene_dims else 0.18,
+                "confianza": float(row["confianza"]),
+                "opacity": 1.0,
+            }
+
+        for fn, det in det_by_frame.items():
+            result[fn].append(det)
+
+        # Interpolación lineal entre frames detectados consecutivos
+        for i in range(len(frames_list) - 1):
+            f1, f2 = frames_list[i], frames_list[i + 1]
+            if f2 - f1 <= 1:
+                continue
+            d1, d2 = det_by_frame[f1], det_by_frame[f2]
+            for fi in range(f1 + 1, f2):
+                t = (fi - f1) / (f2 - f1)
+                result[fi].append({
+                    "track_id": int(track_id),
+                    "x": d1["x"] + t * (d2["x"] - d1["x"]),
+                    "y": d1["y"] + t * (d2["y"] - d1["y"]),
+                    "ancho": d1["ancho"] + t * (d2["ancho"] - d1["ancho"]),
+                    "alto": d1["alto"] + t * (d2["alto"] - d1["alto"]),
+                    "confianza": d1["confianza"],
+                    "opacity": 1.0,
+                })
+
+        # Fade-out tras el último avistamiento (opacidad 1.0 → 0.0 en 8 frames)
+        last_frame = frames_list[-1]
+        last_det = det_by_frame[last_frame]
+        for i in range(1, FADEOUT_FRAMES + 1):
+            fi = last_frame + i
+            if fi >= total_frames:
+                break
+            result[fi].append({
+                "track_id": int(track_id),
+                "x": last_det["x"],
+                "y": last_det["y"],
+                "ancho": last_det["ancho"],
+                "alto": last_det["alto"],
+                "confianza": last_det["confianza"],
+                "opacity": 1.0 - (i / FADEOUT_FRAMES),
+            })
+
+    return result
+
+
 def generar_video_overlay(
     video_input: str,
     csv_detecciones: str,
@@ -83,20 +171,26 @@ def generar_video_overlay(
 
     tiene_dims = "ancho_norm" in df.columns and "alto_norm" in df.columns
 
-    dets_por_frame: dict = defaultdict(list)
-    for _, row in df.iterrows():
-        dets_por_frame[int(row["frame_numero"])].append({
-            "track_id": int(row.get("track_id", -1)),
-            "x": float(row["x_centro_norm"]),
-            "y": float(row["y_centro_norm"]),
-            "ancho": float(row["ancho_norm"]) if tiene_dims else 0.06,
-            "alto": float(row["alto_norm"]) if tiene_dims else 0.18,
-            "confianza": float(row["confianza"]),
-        })
+    # Remapear track_ids a etiquetas secuenciales P1, P2... por orden de primer avistamiento
+    if "track_id" in df.columns:
+        primer_frame = (
+            df[df["track_id"] >= 0]
+            .groupby("track_id")["frame_numero"]
+            .min()
+            .sort_values()
+        )
+        track_label_map = {int(tid): f"P{i+1}" for i, (tid, _) in enumerate(primer_frame.items())}
+    else:
+        track_label_map = {}
 
     cap = cv2.VideoCapture(video_input)
     if not cap.isOpened():
         raise ValueError(f"No se pudo abrir el video: {video_input}")
+
+    total_frames_hint = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames_hint <= 0:
+        total_frames_hint = 2 ** 31
+    dets_interpoladas = interpolar_detecciones(df, total_frames_hint, tiene_dims)
 
     fps_video = cap.get(cv2.CAP_PROP_FPS) or 25.0
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -139,7 +233,7 @@ def generar_video_overlay(
             if not ret:
                 break
 
-            dets = dets_por_frame.get(frame_num, [])
+            dets = dets_interpoladas.get(frame_num, [])
 
             # Dibuja zonas
             for zona in zonas:
@@ -156,10 +250,17 @@ def generar_video_overlay(
                 tid = det["track_id"]
                 cx = int(det["x"] * w)
                 cy = int(det["y"] * h)
-                color = _color(tid)
+                opacity = det.get("opacity", 1.0)
+                base_color = _color(tid)
+                draw_color = (
+                    tuple(int(c * opacity) for c in base_color)
+                    if opacity < 1.0 else base_color
+                )
 
-                historiales[tid].append((cx, cy))
-                _draw_trail(frame, list(historiales[tid]), color)
+                # Solo actualizar el historial de trayectoria en frames reales/interpolados
+                if opacity >= 1.0:
+                    historiales[tid].append((cx, cy))
+                _draw_trail(frame, list(historiales[tid]), draw_color)
 
                 bw = max(10, int(det["ancho"] * w))
                 bh = max(20, int(det["alto"] * h))
@@ -167,12 +268,14 @@ def generar_video_overlay(
                 ry1 = max(0, cy - bh // 2)
                 rx2 = min(w - 1, cx + bw // 2)
                 ry2 = min(h - 1, cy + bh // 2)
-                cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), color, 2)
+                cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), draw_color, 2)
 
-                label = (f"ID {tid} · {det['confianza']:.2f}"
-                         if tid >= 0 else f"· {det['confianza']:.2f}")
+                label = (
+                    f"{track_label_map.get(tid, f'P?')} {det['confianza']:.2f}"
+                    if tid >= 0 else f"{det['confianza']:.2f}"
+                )
                 cv2.putText(frame, label, (rx1, max(12, ry1 - 4)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.42, draw_color, 1, cv2.LINE_AA)
 
             if use_imageio:
                 imageio_writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
