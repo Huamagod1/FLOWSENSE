@@ -177,6 +177,7 @@ export default function ResultadosPage() {
                       zones={zones}
                       metricas={metricas}
                       flujoZonas={flujoZonas}
+                      tracks={tracks}
                     />
                   </Card>
                 </div>
