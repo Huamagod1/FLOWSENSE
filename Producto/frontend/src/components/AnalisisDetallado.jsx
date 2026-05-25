@@ -36,6 +36,14 @@ function InfoIcon() {
   )
 }
 
+function getHeatColor(normalized) {
+  if (normalized <= 0.2) return { r: 59,  g: 130, b: 246, a: 0.3 }
+  if (normalized <= 0.4) return { r: 6,   g: 182, b: 212, a: 0.5 }
+  if (normalized <= 0.6) return { r: 250, g: 204, b: 21,  a: 0.7 }
+  if (normalized <= 0.8) return { r: 249, g: 115, b: 22,  a: 0.8 }
+  return                        { r: 220, g: 38,  b: 38,  a: 0.9 }
+}
+
 function ColHeader({ label, tooltip }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
@@ -196,28 +204,42 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
     return items
   })()
 
-  // ── Heatmap canvas ────────────────────────────────────────────────────────
+  // ── Heatmap canvas — escala por personas únicas por zona ─────────────────
   useEffect(() => {
-    if (!imgLoaded || !canvasRef.current || !detecciones.length) return
+    if (!imgLoaded || !canvasRef.current || !metricas.length || !zones.length) return
     const canvas = canvasRef.current
     const img    = imgRef.current
     canvas.width  = img.offsetWidth
     canvas.height = img.offsetHeight
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    detecciones.forEach(d => {
-      const x = d.x * canvas.width
-      const y = d.y * canvas.height
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, 30)
-      gradient.addColorStop(0, 'rgba(255,0,0,0.6)')
-      gradient.addColorStop(0.5, 'rgba(255,165,0,0.3)')
-      gradient.addColorStop(1, 'rgba(0,0,255,0)')
+
+    const metricaMap = {}
+    metricas.forEach(m => { metricaMap[m.idZona] = m })
+
+    const values = zones.map(z => metricaMap[z.id]?.personasUnicas ?? 0)
+    const minVal = Math.min(...values)
+    const maxVal = Math.max(...values)
+    const range  = maxVal - minVal
+    const normalize = v => range === 0 ? 0.5 : (v - minVal) / range
+
+    const BASE_RADIUS = 60
+    zones.forEach(z => {
+      const cx  = (z.xNorm + z.anchoNorm / 2) * canvas.width
+      const cy  = (z.yNorm + z.altoNorm  / 2) * canvas.height
+      const val = metricaMap[z.id]?.personasUnicas ?? 0
+      const n   = normalize(val)
+      const { r, g, b, a } = getHeatColor(n)
+      const radius = BASE_RADIUS * (0.5 + n)
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
+      gradient.addColorStop(0, `rgba(${r},${g},${b},${a})`)
+      gradient.addColorStop(1, `rgba(${r},${g},${b},0)`)
       ctx.fillStyle = gradient
       ctx.beginPath()
-      ctx.arc(x, y, 30, 0, Math.PI * 2)
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2)
       ctx.fill()
     })
-  }, [imgLoaded, detecciones])
+  }, [imgLoaded, metricas, zones])
 
   function renderBarLabel({ x, y, width, height, value, index }) {
     const m = rankingData[index]
@@ -241,15 +263,23 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
         </p>
         <div style={{ position: 'relative', display: 'inline-block', width: '100%', maxWidth: 800, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e4e7' }}>
           {frameSrc
-            ? <img ref={imgRef} src={frameSrc} alt="Frame del video" style={{ width: '100%', display: 'block' }} onLoad={() => setImgLoaded(true)} />
+            ? <img ref={imgRef} src={frameSrc} alt="Frame del video" style={{ width: '100%', display: 'block', opacity: 0.55 }} onLoad={() => setImgLoaded(true)} />
             : <div style={{ width: '100%', paddingBottom: '56.25%', background: '#1f2028' }} />
           }
           <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>Menor tráfico</span>
-          <div style={{ width: 200, height: 12, borderRadius: 4, background: 'linear-gradient(to right, rgba(0,0,255,0), rgba(255,165,0,0.3), rgba(255,0,0,0.6))' }} />
-          <span style={{ fontSize: 12, color: '#6b7280' }}>Mayor tráfico</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>Bajo tráfico</span>
+          {[
+            { color: '#3b82f6', opacity: 0.3 },
+            { color: '#06b6d4', opacity: 0.5 },
+            { color: '#facc15', opacity: 0.7 },
+            { color: '#f97316', opacity: 0.8 },
+            { color: '#dc2626', opacity: 0.9 },
+          ].map(({ color, opacity }) => (
+            <div key={color} style={{ width: 28, height: 14, borderRadius: 3, background: color, opacity }} />
+          ))}
+          <span style={{ fontSize: 12, color: '#6b7280' }}>Alto tráfico</span>
         </div>
       </div>
 
