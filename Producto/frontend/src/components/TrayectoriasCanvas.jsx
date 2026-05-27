@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const PRIMARY = '#7C3AED'
 
@@ -6,6 +6,7 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
   const canvasRef    = useRef()
   const imgRef       = useRef()
   const containerRef = useRef()
+  const [imgLoaded, setImgLoaded] = useState(false)
 
   function draw() {
     const canvas = canvasRef.current
@@ -15,6 +16,7 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
     // Usar naturalWidth como fallback cuando el tab está oculto (offsetWidth === 0)
     const w = img.offsetWidth  > 0 ? img.offsetWidth  : img.naturalWidth
     const h = img.offsetHeight > 0 ? img.offsetHeight : img.naturalHeight
+
     canvas.width  = w
     canvas.height = h
 
@@ -74,55 +76,99 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
 
     if (flujoZonas.length > 0) {
       const maxConteo = Math.max(...flujoZonas.map(f => f.conteoTracks || 0))
-      flujoZonas.forEach(f => {
-        const from = zoneCenters[f.zonaOrigenId]
-        const to   = zoneCenters[f.zonaDestinoId]
-        if (!from || !to || f.zonaOrigenId === f.zonaDestinoId) return
+      if (maxConteo > 0) {
+        flujoZonas.forEach(f => {
+          const from = zoneCenters[f.zonaOrigenId]
+          const to   = zoneCenters[f.zonaDestinoId]
+          if (!from || !to || f.zonaOrigenId === f.zonaDestinoId) return
 
-        const lineWidth = Math.max(1, Math.round((f.conteoTracks / maxConteo) * 5))
-        const dx  = to.x - from.x
-        const dy  = to.y - from.y
-        const len = Math.sqrt(dx * dx + dy * dy)
-        if (len === 0) return
-        const ux        = dx / len
-        const uy        = dy / len
-        const arrowSize = 8
+          const lineWidth = Math.max(1, Math.round((f.conteoTracks / maxConteo) * 5))
+          const dx  = to.x - from.x
+          const dy  = to.y - from.y
+          const len = Math.sqrt(dx * dx + dy * dy)
+          if (len === 0) return
+          const ux        = dx / len
+          const uy        = dy / len
+          const arrowSize = 8
+
+          ctx.beginPath()
+          ctx.moveTo(from.x, from.y)
+          ctx.lineTo(to.x, to.y)
+          ctx.strokeStyle = 'rgba(255,255,255,0.75)'
+          ctx.lineWidth   = lineWidth
+          ctx.setLineDash([])
+          ctx.stroke()
+
+          const ax = to.x - ux * arrowSize
+          const ay = to.y - uy * arrowSize
+          ctx.beginPath()
+          ctx.moveTo(to.x, to.y)
+          ctx.lineTo(ax - uy * arrowSize * 0.5, ay + ux * arrowSize * 0.5)
+          ctx.lineTo(ax + uy * arrowSize * 0.5, ay - ux * arrowSize * 0.5)
+          ctx.closePath()
+          ctx.fillStyle = 'rgba(255,255,255,0.75)'
+          ctx.fill()
+        })
+      }
+    }
+
+    // Trayectorias individuales: arcos bezier entre zona inicio y zona fin por track
+    const tracksMovimiento = tracks.filter(t =>
+      t.zonaInicioId && t.zonaFinId &&
+      t.zonaInicioId !== t.zonaFinId &&
+      (t.framesTotal || 0) >= 2
+    )
+    const MAX_TRACKS = 30
+    const tracksAMostrar = tracksMovimiento.slice(0, MAX_TRACKS)
+
+    if (tracksAMostrar.length > 0) {
+      const palette = ['#f97316','#06b6d4','#10b981','#a855f7','#f43f5e','#eab308','#3b82f6','#84cc16','#f472b6','#22d3ee']
+      tracksAMostrar.forEach((t, i) => {
+        const from = zoneCenters[t.zonaInicioId]
+        const to   = zoneCenters[t.zonaFinId]
+        if (!from || !to) return
+        const color = palette[i % palette.length]
+        const n     = tracksAMostrar.length
+        const ratio = n > 1 ? (i / (n - 1) - 0.5) : 0
+        const dx    = to.x - from.x
+        const dy    = to.y - from.y
+        const len   = Math.sqrt(dx * dx + dy * dy) || 1
+        const curva = ratio * Math.min(len * 0.4, 50)
+        const cpx   = (from.x + to.x) / 2 - (dy / len) * curva
+        const cpy   = (from.y + to.y) / 2 + (dx / len) * curva
 
         ctx.beginPath()
         ctx.moveTo(from.x, from.y)
-        ctx.lineTo(to.x, to.y)
-        ctx.strokeStyle = 'rgba(255,255,255,0.75)'
-        ctx.lineWidth   = lineWidth
+        ctx.quadraticCurveTo(cpx, cpy, to.x, to.y)
+        ctx.strokeStyle = color + '77'
+        ctx.lineWidth   = 1.5
+        ctx.setLineDash([5, 4])
         ctx.stroke()
-
-        const ax = to.x - ux * arrowSize
-        const ay = to.y - uy * arrowSize
-        ctx.beginPath()
-        ctx.moveTo(to.x, to.y)
-        ctx.lineTo(ax - uy * arrowSize * 0.5, ay + ux * arrowSize * 0.5)
-        ctx.lineTo(ax + uy * arrowSize * 0.5, ay - ux * arrowSize * 0.5)
-        ctx.closePath()
-        ctx.fillStyle = 'rgba(255,255,255,0.75)'
-        ctx.fill()
+        ctx.setLineDash([])
       })
     }
   }
 
   useEffect(() => {
-    if (frameSrc && imgRef.current?.complete) draw()
-  }, [zones, metricas, flujoZonas, frameSrc])
+    if (imgLoaded) draw()
+  }, [imgLoaded, zones, metricas, flujoZonas, tracks])
 
   // Redibujar cuando el tab se vuelve visible (ResizeObserver detecta cambio de 0 a dimensiones reales)
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     const observer = new ResizeObserver(() => {
-      if (imgRef.current?.complete && imgRef.current.naturalWidth) draw()
+      if (imgLoaded && imgRef.current?.naturalWidth) draw()
     })
     observer.observe(container)
     return () => observer.disconnect()
-  }, [zones, metricas, flujoZonas])
+  }, [imgLoaded, zones, metricas, flujoZonas, tracks])
 
+  const tracksConMovimiento = tracks.filter(t =>
+    t.zonaInicioId && t.zonaFinId &&
+    t.zonaInicioId !== t.zonaFinId &&
+    (t.framesTotal || 0) >= 2
+  )
   const tracksInsuficientes = tracks.length > 0 && tracks.every(t => (t.framesTotal || 0) < 2)
 
   if (!frameSrc) {
@@ -146,16 +192,26 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
           src={frameSrc}
           alt="Trayectorias de personas"
           style={{ width: '100%', display: 'block', opacity: 0.55 }}
-          onLoad={draw}
+          onLoad={() => setImgLoaded(true)}
         />
         <canvas
           ref={canvasRef}
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
         />
       </div>
+      {zones.length === 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
+          Sin datos de zonas para visualizar.
+        </p>
+      )}
       {flujoZonas.length === 0 && zones.length > 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
           No se detectaron movimientos entre zonas. Las burbujas muestran personas únicas por zona.
+        </p>
+      )}
+      {tracksConMovimiento.length > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7280' }}>
+          Las líneas punteadas muestran trayectorias individuales entre zonas ({tracksConMovimiento.length} personas con movimiento entre zonas).
         </p>
       )}
       {tracksInsuficientes && (
