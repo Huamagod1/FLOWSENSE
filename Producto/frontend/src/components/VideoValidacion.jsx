@@ -42,7 +42,9 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
   const [overlayLoading, setOverlayLoading] = useState(true)
   const [overlayError, setOverlayError]     = useState(false)
   const [eventos, setEventos]               = useState([])
+  const [eventosTruncados, setEventosTruncados] = useState(false)
   const [currentTime, setCurrentTime]       = useState(0)
+  const [videoDuration, setVideoDuration]   = useState(0)
   const [eliminando, setEliminando]         = useState(false)
   const [eliminado, setEliminado]           = useState(false)
   const videoRef = useRef()
@@ -64,13 +66,32 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
   // ── Carga todos los eventos ────────────────────────────────────────────────
   useEffect(() => {
     getEventos(videoId, 0, 999999)
-      .then(r => setEventos(r.data?.eventos || []))
+      .then(r => {
+        const ev = r.data?.eventos || []
+        setEventos(ev)
+        if (r.data?.total != null && ev.length < r.data.total) {
+          setEventosTruncados(true)
+        }
+      })
       .catch(() => {})
   }, [videoId])
 
   const handleTimeUpdate = () => {
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
   }
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) setVideoDuration(videoRef.current.duration || 0)
+  }
+
+  // El overlay se codifica a min(fps_original, 24) fps, mientras que e.tiempo usa fps_original.
+  // Si fps_original > 24, el overlay dura más que el original y currentTime != e.tiempo.
+  // Corrección: originalTime = currentTime × duracionOriginalSeg / videoDuration
+  const originalTime = useMemo(() => {
+    const dur = confiabilidad?.duracionOriginalSeg
+    if (videoDuration > 0 && dur > 0) return currentTime * dur / videoDuration
+    return currentTime
+  }, [currentTime, videoDuration, confiabilidad?.duracionOriginalSeg])
 
   // ── Mapeo track_id real → etiqueta secuencial (P1, P2...) ────────────────
   const trackLabelMap = useMemo(() => {
@@ -86,14 +107,14 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
 
   // ── Eventos en ventana ±VENTANA_PANEL del tiempo actual ──────────────────
   const eventosPanel = useMemo(
-    () => eventos.filter(e => Math.abs(e.tiempo - currentTime) <= VENTANA_PANEL),
-    [eventos, currentTime],
+    () => eventos.filter(e => Math.abs(e.tiempo - originalTime) <= VENTANA_PANEL),
+    [eventos, originalTime],
   )
 
   // ── Eventos en el frame actual (±TOLERANCIA_FRAME) ───────────────────────
   const eventosCurrent = useMemo(
-    () => eventosPanel.filter(e => Math.abs(e.tiempo - currentTime) <= TOLERANCIA_FRAME),
-    [eventosPanel, currentTime],
+    () => eventosPanel.filter(e => Math.abs(e.tiempo - originalTime) <= TOLERANCIA_FRAME),
+    [eventosPanel, originalTime],
   )
 
   // ── Estadísticas del frame actual (datos reales del instante) ─────────────
@@ -175,6 +196,15 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
         </p>
       </Card>
 
+      {eventosTruncados && (
+        <div style={{
+          marginBottom: 12, padding: '8px 12px', borderRadius: 6,
+          background: '#fef3c7', border: '1px solid #f59e0b', fontSize: 12, color: '#92400e',
+        }}>
+          Aviso: el volumen de eventos de este video supera el limite de carga. El panel de eventos puede mostrar datos incompletos en segundos del final del video. Las metricas globales en las otras tabs no se ven afectadas.
+        </div>
+      )}
+
       {/* Layout: video izquierda | panel derecha */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 16 }}>
 
@@ -220,6 +250,7 @@ export default function VideoValidacion({ videoId, confiabilidad }) {
               src={overlaySrc}
               controls
               onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
               style={{ width: '100%', display: 'block', maxHeight: 500 }}
             />
           )}

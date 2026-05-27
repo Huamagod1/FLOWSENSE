@@ -154,7 +154,7 @@ public class PythonOrchestratorService {
                 "--output", csvOutput.toAbsolutePath().toString(),
                 "--conf", conf,
                 "--modelo", modelo,
-                "--fps", "1",
+                "--fps", "10",
                 "--tracker", "bytetrack"
         );
 

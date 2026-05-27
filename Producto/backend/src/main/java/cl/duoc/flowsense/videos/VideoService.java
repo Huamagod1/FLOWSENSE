@@ -220,6 +220,7 @@ public class VideoService {
                 .nivelConfiabilidad(video.getNivelConfiabilidad())
                 .overlayDisponible(video.getVideoOverlayPath() != null)
                 .videoOriginalDisponible(video.getVideoOriginalDisponible())
+                .duracionOriginalSeg(video.getDuracionSegundos())
                 .build();
     }
 
@@ -277,9 +278,9 @@ public class VideoService {
                     .toList();
         }
 
-        // si no hay filtro de rango, devolver primeros 100; siempre máximo 500
+        // sin rango: exploración rápida (100); con rango explícito: análisis completo (20000)
         List<EventoDto> pagina = filtrados.stream()
-                .limit((desde == null && hasta == null) ? 100 : 500)
+                .limit((desde == null && hasta == null) ? 100 : 20000)
                 .toList();
 
         return EventosResponse.builder()

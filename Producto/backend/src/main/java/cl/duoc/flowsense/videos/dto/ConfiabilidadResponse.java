@@ -12,4 +12,5 @@ public class ConfiabilidadResponse {
     private String nivelConfiabilidad;
     private Boolean overlayDisponible;
     private Boolean videoOriginalDisponible;
+    private Integer duracionOriginalSeg;
 }

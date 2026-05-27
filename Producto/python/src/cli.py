@@ -15,7 +15,7 @@ def parsear_args():
     # Argumentos de modo detectar (validados programáticamente en detector.py)
     p.add_argument("--output", default=None, help="Ruta del CSV a generar (requerido en modo detectar)")
     p.add_argument("--zonas",  default=None, help="Ruta JSON con zonas del recinto (requerido en modo detectar)")
-    p.add_argument("--fps",    type=float, default=1.0,  help="Frames/s a muestrear (default: 1)")
+    p.add_argument("--fps",    type=float, default=10.0, help="Frames/s a muestrear (default: 10)")
     p.add_argument("--conf",   type=float, default=0.45, help="Umbral de confianza (default: 0.45)")
     p.add_argument("--iou",    type=float, default=0.7,  help="Umbral IoU para NMS (default: 0.7)")
     p.add_argument("--imgsz",  type=int,   default=640,  help="Tamaño de entrada del modelo (default: 640)")
