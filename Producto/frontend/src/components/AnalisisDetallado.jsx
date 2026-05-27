@@ -209,8 +209,11 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
     if (!imgLoaded || !canvasRef.current || !metricas.length || !zones.length) return
     const canvas = canvasRef.current
     const img    = imgRef.current
-    canvas.width  = img.offsetWidth
-    canvas.height = img.offsetHeight
+    if (!img) return
+    // Usar naturalWidth como fallback cuando la tab está oculta (offsetWidth === 0)
+    canvas.width  = img.offsetWidth  > 0 ? img.offsetWidth  : (img.naturalWidth  || 0)
+    canvas.height = img.offsetHeight > 0 ? img.offsetHeight : (img.naturalHeight || 0)
+    if (canvas.width === 0 || canvas.height === 0) return
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -223,22 +226,29 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
     const range  = maxVal - minVal
     const normalize = v => range === 0 ? 0.5 : (v - minVal) / range
 
-    const BASE_RADIUS = 60
-    zones.forEach(z => {
-      const cx  = (z.xNorm + z.anchoNorm / 2) * canvas.width
-      const cy  = (z.yNorm + z.altoNorm  / 2) * canvas.height
-      const val = metricaMap[z.id]?.personasUnicas ?? 0
-      const n   = normalize(val)
-      const { r, g, b, a } = getHeatColor(n)
-      const radius = BASE_RADIUS * (0.5 + n)
-      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
-      gradient.addColorStop(0, `rgba(${r},${g},${b},${a})`)
-      gradient.addColorStop(1, `rgba(${r},${g},${b},0)`)
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-      ctx.fill()
-    })
+    try {
+      zones.forEach(z => {
+        const cx  = (z.xNorm + z.anchoNorm / 2) * canvas.width
+        const cy  = (z.yNorm + z.altoNorm  / 2) * canvas.height
+        if (!isFinite(cx) || !isFinite(cy)) return
+        const val = metricaMap[z.id]?.personasUnicas ?? 0
+        const n   = normalize(val)
+        const { r, g, b, a } = getHeatColor(n)
+        const radioBase = Math.min(z.anchoNorm, z.altoNorm) * 0.4
+        const radiusPx  = radioBase * Math.min(canvas.width, canvas.height)
+        const radius    = radiusPx * (0.6 + n * 0.4)
+        if (!isFinite(radius) || radius <= 0) return
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
+        gradient.addColorStop(0, `rgba(${r},${g},${b},${a})`)
+        gradient.addColorStop(1, `rgba(${r},${g},${b},0)`)
+        ctx.fillStyle = gradient
+        ctx.beginPath()
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+        ctx.fill()
+      })
+    } catch {
+      // Error en canvas: el frame se muestra sin heatmap superpuesto
+    }
   }, [imgLoaded, metricas, zones])
 
   function renderBarLabel({ x, y, width, height, value, index }) {
