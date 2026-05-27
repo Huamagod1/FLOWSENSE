@@ -28,11 +28,13 @@ public class ZonaRequest {
     @DecimalMax("1.0")
     private BigDecimal yNorm;
 
+    @JsonProperty("anchoNorm")
     @NotNull
     @DecimalMin("0.0")
     @DecimalMax("1.0")
     private BigDecimal anchoNorm;
 
+    @JsonProperty("altoNorm")
     @NotNull
     @DecimalMin("0.0")
     @DecimalMax("1.0")
