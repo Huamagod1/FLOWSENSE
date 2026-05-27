@@ -86,10 +86,38 @@ All API endpoints are prefixed with `/api`.
 | Method | Endpoint | Description | Request Body |
 |--------|----------|-------------|--------------|
 | GET | `/{id}` | Obtiene información general y estado de un video. | - |
-| GET | `/{id}/frame-preview` | Obtiene datos para la previsualización de frames. | - |
+| GET | `/{id}/estado` | Polling del estado de procesamiento del video. | - |
+| GET | `/{id}/frame-preview` | Obtiene metadatos del frame preview (ruta, dimensiones). | - |
 | GET | `/{id}/frame-preview/imagen` | Sirve la imagen PNG del frame para previsualizar. | - |
 | PUT | `/{id}/analisis` | Guarda zonas y dispara el proceso de análisis. | `GuardarZonasYProcesarRequest` |
 | GET | `/{id}/resumen` | Obtiene los resultados finales y métricas del análisis. | - |
+| GET | `/{id}/metricas` | Métricas calculadas por zona (4 métricas clásicas). | - |
+| GET | `/{id}/metricas-temporales` | Métricas por franja temporal. | - |
+| GET | `/{id}/detecciones` | Puntos para heatmap (coordenadas anónimas). | - |
+| POST | `/{id}/precio-sugerido` | Calcula precios sugeridos dado un precio base. | `PrecioSugeridoRequest` |
+| GET | `/{id}/zonas` | Lista las zonas definidas para el video. | - |
+| PUT | `/{id}/zonas` | Guarda/actualiza zonas en batch. | `List<ZonaRequest>` |
+| POST | `/{id}/zonas/confirmar` | Confirma zonas y lanza el análisis. | - |
+| DELETE | `/{id}` | Elimina el video y todos sus datos asociados. | - |
+
+### Endpoints de Tracking (`/api/videos`)
+*Requiere Autenticación — disponibles solo cuando estado=COMPLETADO*
+
+| Method | Endpoint | Description | Request Body |
+|--------|----------|-------------|--------------|
+| GET | `/{id}/tracks` | Lista tracks individuales (ByteTrack): zona inicio/fin, frames, duración. | - |
+| GET | `/{id}/flujo-zonas` | Flujo agregado entre pares de zonas (origen → destino, conteo). | - |
+| GET | `/{id}/metricas-tracking` | 8 métricas de tracking por zona (personas únicas, permanencia, etc.). | - |
+
+### Endpoints de Validación (`/api/videos`)
+*Requiere Autenticación — disponibles solo cuando estado=COMPLETADO*
+
+| Method | Endpoint | Description | Parámetros |
+|--------|----------|-------------|------------|
+| GET | `/{id}/confiabilidad` | Score de confiabilidad del análisis (ALTO/MEDIO/BAJO) con detalles de confianza promedio, calidad de tracking y % frames OK. | - |
+| GET | `/{id}/video-overlay` | Stream MP4 del video original con trayectorias de tracking superpuestas (H.264, acceso solo del dueño). | - |
+| GET | `/{id}/eventos` | Eventos de entrada/salida por zona en el tiempo, paginado por ventana de frames. | `?desde=0&hasta=900` |
+| DELETE | `/{id}/video-original` | Elimina el MP4 original del servidor (libera espacio). Las métricas y el overlay NO se eliminan. | - |
 
 ### `GuardarZonasYProcesarRequest`
 ```json
@@ -105,5 +133,25 @@ All API endpoints are prefixed with `/api`.
       "orden": 0
     }
   ]
+}
+```
+
+### `PrecioSugeridoRequest`
+```json
+{
+  "precioBase": 150000
+}
+```
+
+### Respuesta `ConfiabilidadResponse`
+```json
+{
+  "nivelConfiabilidad": "ALTO",
+  "confianzaPromedio": 0.81,
+  "calidadTracking": 0.76,
+  "porcentajeFramesOk": 0.97,
+  "totalFramesProcesados": 897,
+  "totalDetecciones": 2341,
+  "personasUnicas": 47
 }
 ```

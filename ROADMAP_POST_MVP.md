@@ -32,8 +32,8 @@ Estimación de edad y género por zona usando modelos complementarios. Requiere 
 
 ## Funcionalidades técnicas avanzadas
 
-### Tracking individual entre frames
-Implementación de DeepSORT o ByteTrack para seguir personas individuales. Permite calcular dwell time exacto.
+### Tracking con coordenadas por frame (trayectorias pixel a pixel)
+ByteTrack ya está implementado en el MVP para calcular personas únicas, permanencia y flujo entre zonas. Lo que falta: persistir las coordenadas x/y de cada detección por frame agrupadas por track_id en la BD, para poder dibujar trayectorias punto a punto en lugar de arcos zona→zona.
 
 ### Procesamiento en tiempo real
 Análisis de cámaras IP en streaming en lugar de videos pregrabados.

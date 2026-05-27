@@ -1,5 +1,9 @@
 # Guía operacional — Claude Code para FlowSense Sprint 2
 
+> **Nota histórica (2026-05-27):** Este documento corresponde a la guía de configuración del Sprint 2, que ya está completado. Se conserva como referencia del proceso de trabajo con Claude Code. Las instrucciones de setup (venv, Docker, extensión VS Code) siguen siendo válidas para nuevos integrantes. Los prompts y tareas listados ya fueron ejecutados.
+
+---
+
 Esta guía te dice exactamente qué hacer desde VS Code para commitear el contexto y luego desarrollar el Sprint 2 (pipeline Python + backend Spring Boot) con Claude Code según la carta Gantt.
 
 ## Fase 0 — Limpieza del repo (antes de cualquier otra cosa)

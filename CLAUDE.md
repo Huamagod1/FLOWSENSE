@@ -59,20 +59,25 @@ Donde cada componente está normalizado al promedio del recinto. Una zona con sc
 El flujo completo desde que el admin sube un video hasta que recibe las métricas:
 
 ```
-1. Admin sube MP4 desde React → Spring Boot
-2. Spring Boot guarda MP4, crea VIDEOS con estado=PENDIENTE
-3. Spring Boot invoca Python: --modo extraer-frame
-4. Python extrae frame del segundo 5, devuelve PNG
-5. Estado=FRAME_LISTO, frontend redirige al editor de zonas
-6. Admin dibuja rectángulos sobre el frame con react-konva
-7. Estado=ESPERANDO_ZONAS mientras dibuja
-8. Admin guarda zonas y lanza análisis
-9. Spring Boot invoca Python: --modo detectar (detección completa)
-10. Python procesa el video con YOLOv8 y escribe CSV anónimo
-11. Spring Boot lee CSV, inserta en DETECCIONES, calcula las 4 métricas
-12. Estado=COMPLETADO, frontend redirige al dashboard
-13. Admin ve métricas, score y precios sugeridos
-14. Admin exporta reporte PDF para negociación con arrendatarios
+1.  Admin sube MP4 desde React → Spring Boot
+2.  Spring Boot guarda MP4, crea VIDEOS con estado=PENDIENTE
+3.  Spring Boot invoca Python: --modo extraer-frame
+4.  Python extrae frame del segundo 5, devuelve PNG
+5.  Estado=FRAME_LISTO, frontend redirige al editor de zonas
+6.  Admin dibuja rectángulos sobre el frame con react-konva
+7.  Estado=ESPERANDO_ZONAS mientras dibuja
+8.  Admin guarda zonas y lanza análisis
+9.  Spring Boot invoca Python: --modo detectar (--fps 10 --tracker bytetrack)
+10. Python procesa el video con YOLOv8 + ByteTrack, escribe CSV anónimo
+    con columnas: frame_numero, zona_id, track_id, x/y_centro_norm, confianza, detenida
+11. Python genera video overlay (H.264) con trayectorias dibujadas
+12. Python escribe JSON resumen con 8 métricas de tracking por zona a stdout
+13. Spring Boot lee CSV, inserta en DETECCIONES, calcula métricas clásicas
+14. Spring Boot lee JSON resumen, inserta en TRACKS, FLUJO_ENTRE_ZONAS,
+    METRICAS_TRACKING y CONFIABILIDAD_VIDEO
+15. Estado=COMPLETADO, frontend redirige al dashboard de 5 tabs
+16. Admin ve métricas, score, trayectorias y precios sugeridos
+17. Admin puede eliminar el video original manualmente para liberar espacio
 ```
 
 ## Estructura del repositorio
@@ -109,8 +114,10 @@ FLOWSENSE/
 - 3 modelos soportados: yolov8n (default), yolov8s, yolov8m
 - Tracking anónimo con ByteTrack (lapx): asigna track_id temporal (entero) por persona dentro del video; sin biometría ni identidad persistente
 - track_id = -1 para detecciones sin track asignado (compatibilidad hacia atrás con videos procesados antes del tracking)
+- **Sample rate actual**: 10 fps (antes 1 fps). Necesario para tracking estable entre frames; ByteTrack requiere continuidad temporal.
 - Métrica derivada: persona-segundos por zona = OTS; con tracking: OTS sin doble conteo vía SUM de frames por track_id
 - Las zonas son filtro POSTERIOR a YOLO (YOLO detecta en todo el frame)
+- **Video overlay**: Python genera un MP4 con las trayectorias de tracking dibujadas sobre el video original. Codec H.264 (avc1); fallback a imageio + libx264 si avc1 no está disponible en OpenCV.
 
 ### Material de prueba del MVP académico
 
@@ -123,10 +130,11 @@ FLOWSENSE/
 
 Estas restricciones aplican a todo el sistema. Si una implementación las viola, debe cuestionarse:
 
-- NUNCA almacenar imágenes de personas (procesamiento solo en RAM)
+- NUNCA almacenar imágenes de personas (procesamiento solo en RAM). Excepción única: el frame estático del segundo 5 para el editor de zonas — no contiene personas identificables en la mayoría de los casos y es el fondo del canvas.
 - NUNCA implementar reconocimiento facial ni tracking biométrico (sin rasgos faciales, edad, género, color de ropa ni identidad persistente entre sesiones)
 - El tracking anónimo con ByteTrack está permitido: track_id es un entero temporal dentro de la sesión de procesamiento del video, sin vinculación a identidad real
 - NUNCA guardar datos que permitan identificar individuos fuera de su sesión de procesamiento
+- **Política de video original**: el MP4 subido se almacena temporalmente en el servidor y es accesible solo para el administrador dueño del recinto. El admin puede eliminarlo manualmente desde la UI (`DELETE /api/videos/:id/video-original`). Las detecciones en BD son anónimas (solo coordenadas normalizadas + track_id efímero). El video overlay generado (con trayectorias) sí se persiste para la tab de Validación.
 - Cumplimiento Ley 19.628 y Ley 21.719 de Chile (datos personales y biometría)
 - Contraseñas SIEMPRE con BCrypt strength 10
 - JWT secret en variable de entorno, nunca hardcoded
@@ -173,32 +181,34 @@ El proyecto es parte de TPY1101 (DuocUC). Las decisiones priorizan:
 ### Sprint 1 ✅ Completado
 - Setup repo, Docker, estructura, CLAUDE.md base
 
-### Sprint 2 🔄 En curso
+### Sprint 2 ✅ Completado
 - Pipeline Python con YOLOv8 ✅
 - Modos stub y preview ✅
 - Soporte multi-modelo ✅
-- Backend: autenticación básica (registro, login, JWT)
-- Frontend: vistas de login y registro
-- Backend: endpoint de upload de video
-- Backend: orquestación con ProcessBuilder
+- Backend: autenticación (registro, login, JWT) ✅
+- Frontend: vistas de login y registro ✅
+- Backend: endpoint de upload de video ✅
+- Backend: orquestación con ProcessBuilder ✅
 
-### Sprint 3 📋 Planificado
-- Modo `--modo extraer-frame` en Python
-- Endpoint backend para servir el frame
-- Editor visual de zonas en React (react-konva)
-- Persistencia de zonas en BD
-- Estados expandidos del video
-- Flujo end-to-end: subir → zonas → procesar → CSV en BD
+### Sprint 3 ✅ Completado
+- Modo `--modo extraer-frame` en Python ✅
+- Endpoint backend para servir el frame ✅
+- Editor visual de zonas en React (react-konva) ✅
+- Persistencia de zonas en BD ✅
+- Flujo end-to-end: subir → zonas → procesar → CSV en BD ✅
 
-### Sprint 4 📋 Planificado
-- Implementación de las 4 métricas
-- Cálculo de tasa de detención (Python o backend)
-- Cálculo del score compuesto
-- Cálculo del patrón temporal
-- Dashboard React con heatmap, tabla y matriz temporal
-- Sistema de precios sugeridos
+### Sprint 4 ✅ Completado
+- 4 métricas clásicas (tráfico, detención, temporal, score) ✅
+- Tracking individual con ByteTrack ✅ (adelantado de post-MVP)
+- 8 métricas de tracking (personas únicas, permanencia, flujo…) ✅
+- Sample rate 10 fps para tracking estable ✅
+- Video overlay H.264 con trayectorias ✅
+- Dashboard React con 5 tabs (validación, resumen, precio, detalle, flujo) ✅
+- Score de confiabilidad del análisis (ALTO/MEDIO/BAJO) ✅
+- Sistema de precios sugeridos ✅
+- Migraciones BD hasta V11 ✅
 
-### Sprint 5 📋 Planificado (cierre)
+### Sprint 5 📋 En curso (cierre académico)
 - Grabación de videos de validación
 - Procesamiento y análisis comparativo
 - Documento técnico de validación empírica

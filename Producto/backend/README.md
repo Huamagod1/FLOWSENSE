@@ -89,3 +89,52 @@ src/main/resources/
 ## Variables de entorno
 
 Ver `.env.example` para la lista completa con descripción de cada variable.
+
+---
+
+## Migraciones Flyway
+
+Las migraciones están en `src/main/resources/db/migration/` y se aplican automáticamente al arrancar.
+
+| Versión | Archivo | Contenido |
+|---------|---------|-----------|
+| V1 | `V1__schema_auth.sql` | Tablas de autenticación (ORGANIZACIONES, USUARIOS) |
+| V2 | `V2__schema_recintos_zonas.sql` | RECINTOS y ZONAS |
+| V3 | `V3__schema_videos.sql` | VIDEOS con estados del pipeline |
+| V4 | `V4__schema_detecciones_metricas.sql` | DETECCIONES y METRICAS_ZONA, METRICAS_TEMPORALES |
+| V5 | `V5__add_detenida_detecciones.sql` | Columna `detenida` en DETECCIONES |
+| V6 | `V6__add_conf_modelo_videos.sql` | Columnas `conf_usado` y `modelo_usado` en VIDEOS |
+| V7 | `V7__schema_metricas_avanzadas.sql` | Columnas de score compuesto y métricas avanzadas |
+| V8 | `V8__tracking_columns.sql` | Tablas TRACKS y FLUJO_ENTRE_ZONAS para ByteTrack |
+| V9 | `V9__metricas_tracking.sql` | Tabla METRICAS_TRACKING con 8 métricas por zona |
+| V10 | `V10__metricas_tracking_columns.sql` | Columnas adicionales de tracking en METRICAS_TRACKING |
+| V11 | `V11__confiabilidad_video.sql` | Tabla CONFIABILIDAD_VIDEO (score ALTO/MEDIO/BAJO) |
+
+---
+
+## Endpoints nuevos (tracking y validación)
+
+Ver `src/main/java/cl/duoc/flowsense/ENDPOINTS.md` para la referencia completa.
+
+Resumen de endpoints agregados en Sprint 4:
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/videos/{id}/tracks` | Tracks individuales de ByteTrack |
+| GET | `/api/videos/{id}/flujo-zonas` | Flujo agregado entre zonas |
+| GET | `/api/videos/{id}/metricas-tracking` | 8 métricas de tracking por zona |
+| GET | `/api/videos/{id}/confiabilidad` | Score de confiabilidad del análisis |
+| GET | `/api/videos/{id}/video-overlay` | Stream del MP4 overlay con trayectorias |
+| GET | `/api/videos/{id}/eventos` | Eventos de entrada/salida paginados por frames |
+| DELETE | `/api/videos/{id}/video-original` | Elimina el MP4 original del servidor |
+
+---
+
+## Última actualización
+
+**2026-05-27** — Actualización para reflejar el estado actual del backend:
+- Integración de ByteTrack: tracks, flujo entre zonas, métricas de tracking
+- Score de confiabilidad del análisis (ALTO/MEDIO/BAJO)
+- Endpoint de video overlay para validación visual
+- Migraciones Flyway hasta V11
+- Endpoints de eliminación granular (video-original vs análisis completo)

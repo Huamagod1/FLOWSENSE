@@ -1,8 +1,11 @@
 # FlowSense — Detector de flujo peatonal (capa Python)
 
-Script standalone que procesa un video MP4 con YOLOv8n y genera un CSV anónimo
-con las detecciones de personas por zona. Es invocado por Spring Boot vía
-`ProcessBuilder`; también puede ejecutarse directamente desde la línea de comandos.
+Script standalone que procesa un video MP4 con YOLOv8 + ByteTrack y genera:
+- Un **CSV anónimo** con detecciones de personas por zona y track_id efímero
+- Un **video overlay MP4** (H.264) con las trayectorias de tracking dibujadas
+- Un **JSON resumen** por stdout con 8 métricas de tracking por zona
+
+Invocado por Spring Boot vía `ProcessBuilder`; también puede ejecutarse directamente desde la línea de comandos.
 
 ---
 
@@ -59,15 +62,24 @@ Ejecuta desde la carpeta `Producto/python/` con el video de prueba ubicado en
 `/video/p.mp4` en la raíz del repositorio:
 
 ```bash
-# Con YOLO real (requiere ultralytics instalado; descarga yolov8n.pt en la primera ejecución)
+# Con YOLO real + ByteTrack (recomendado, descarga yolov8n.pt en la primera ejecución)
+python detector.py \
+  --video ../../video/p.mp4 \
+  --output resultado.csv \
+  --zonas zonas_prueba.json \
+  --fps 10 \
+  --tracker bytetrack \
+  --conf 0.45 \
+  --iou 0.7 \
+  --imgsz 640
+
+# Sin tracking (solo detección, más rápido)
 python detector.py \
   --video ../../video/p.mp4 \
   --output resultado.csv \
   --zonas zonas_prueba.json \
   --fps 1 \
-  --conf 0.45 \
-  --iou 0.7 \
-  --imgsz 640
+  --tracker none
 
 # Con stub (sin PyTorch, útil para desarrollo o CI sin GPU)
 python detector.py \
@@ -79,10 +91,31 @@ python detector.py \
 
 ### Paso 3 — Verificar la salida
 
-Al terminar, el script imprime en stdout una línea JSON:
+Al terminar, el script imprime en stdout una línea JSON con las métricas completas:
 
 ```json
-{"frames_procesados": 42, "detecciones_totales": 67, "duracion_seg": 3.81, "status": "OK"}
+{
+  "frames_procesados": 900,
+  "detecciones_totales": 1847,
+  "detecciones_detenidas": 645,
+  "tasa_detencion_global": 0.349,
+  "duracion_seg": 245,
+  "modelo_usado": "yolov8n",
+  "personas_unicas_total": 47,
+  "tiempo_permanencia_promedio_global": 18.4,
+  "flujo_entre_zonas": [{"zona_origen": 1, "zona_destino": 2, "conteo": 23}],
+  "metricas_por_zona": {
+    "1": {
+      "personas_unicas": 30,
+      "tiempo_permanencia_promedio": 22.1,
+      "entradas": 31,
+      "salidas": 28,
+      "ots_tracking": 662,
+      "velocidad_flujo_promedio": 0.034
+    }
+  },
+  "status": "OK"
+}
 ```
 
 Y genera `resultado.csv` con el siguiente formato:
@@ -115,10 +148,10 @@ Y genera `resultado.csv` con el siguiente formato:
 ## Formato del CSV de salida
 
 ```csv
-id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza
-42,30,1,0.470000,0.610000,0.8200
-42,30,2,0.730000,0.280000,0.9100
-42,60,1,0.450000,0.580000,0.7700
+id_video,frame_numero,zona_id,track_id,x_centro_norm,y_centro_norm,confianza,detenida
+42,30,1,1,0.470000,0.610000,0.8200,false
+42,30,2,2,0.730000,0.280000,0.9100,false
+42,40,1,1,0.471000,0.609000,0.7900,true
 ```
 
 | Columna | Descripción |
@@ -126,9 +159,11 @@ id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza
 | `id_video` | ID del video (viene del JSON de zonas) |
 | `frame_numero` | Número de frame en el video original |
 | `zona_id` | ID de la zona donde se detectó la persona |
+| `track_id` | ID de track asignado por ByteTrack (entero ≥ 1); -1 si tracker=none |
 | `x_centro_norm` | X del centro de la caja, normalizada en [0,1] |
 | `y_centro_norm` | Y del centro de la caja, normalizada en [0,1] |
 | `confianza` | Score de confianza del modelo (0–1) |
+| `detenida` | `true` si la persona no se movió más del 5% del frame entre frames consecutivos |
 
 Las detecciones fuera de todas las zonas no se escriben al CSV.
 
@@ -150,12 +185,14 @@ python -m unittest discover -s tests -v
 | `--video` | sí | — | Ruta al MP4 de entrada |
 | `--output` | sí | — | Ruta del CSV a generar |
 | `--zonas` | sí | — | Ruta JSON con zonas del recinto |
-| `--fps` | no | `1` | Frames por segundo a muestrear |
+| `--fps` | no | `10` | Frames por segundo a muestrear (10 fps recomendado para ByteTrack) |
 | `--conf` | no | `0.45` | Umbral de confianza |
 | `--iou` | no | `0.7` | Umbral IoU para NMS |
 | `--imgsz` | no | `640` | Tamaño de entrada del modelo |
 | `--modelo` | no | `yolov8n` | Modelo YOLOv8 (`yolov8n`, `yolov8s`, `yolov8m`) |
 | `--max-det` | no | `300` | Máximo de detecciones por frame |
+| `--tracker` | no | `bytetrack` | Motor de tracking: `bytetrack` o `none` |
+| `--overlay-output` | no | — | Ruta del MP4 overlay a generar (H.264); omitir para no generar |
 | `--stub` | no | `false` | Usar detecciones ficticias sin cargar YOLO |
 | `--preview` | no | `false` | Abrir ventana de visualización en vivo (solo desarrollo) |
 
@@ -385,3 +422,17 @@ id_video,frame_numero,zona_id,x_centro_norm,y_centro_norm,confianza,detenida
 | `No se pudo abrir el video` | Ruta relativa calculada desde el directorio equivocado | Usar rutas absolutas, o ejecutar desde `Producto/python/` y usar `..\..\video\p.mp4` |
 | `ExecutionPolicy` bloquea el venv | PowerShell impide ejecutar scripts `.ps1` del venv | Ejecutar una vez: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | Error con rutas que tienen espacios | `"Proyecto duoc"` tiene espacio y rompe el parsing | Encerrar la ruta entre comillas dobles: `--video "C:\Proyecto duoc\video\p.mp4"` |
+| Overlay no genera / error de codec | `avc1` no disponible en la build de OpenCV instalada | El sistema hace fallback automático a `imageio + libx264`. Instalar `imageio-ffmpeg` si no está en requirements. |
+| ByteTrack no sigue personas entre frames | `--fps` demasiado bajo (< 5 fps) → saltos grandes entre frames | Usar `--fps 10` (default actual). ByteTrack necesita continuidad temporal. |
+
+---
+
+## Última actualización
+
+**2026-05-27** — Actualización para reflejar el estado actual del módulo:
+- ByteTrack integrado como tracker por defecto (`--tracker bytetrack`)
+- Sample rate por defecto cambiado de 1 fps a 10 fps
+- CSV ampliado con columna `track_id`
+- JSON stdout ampliado con 8 métricas de tracking por zona
+- Generación de video overlay H.264 (`--overlay-output`)
+- Argumentos CLI nuevos: `--tracker`, `--overlay-output`

@@ -332,12 +332,16 @@ Dependencias clave:
 - Ant Design 5.x (componentes UI)
 - jsPDF + html2canvas (exportación PDF)
 
-### Python 3.12 + YOLOv8
+### Python 3.12 + YOLOv8 + ByteTrack
 
 Dependencias en requirements.txt:
-- ultralytics==8.3.*
+- ultralytics==8.3.* (incluye ByteTrack via lapx)
 - opencv-python-headless==4.10.*
 - numpy==1.26.*
+- imageio-ffmpeg (fallback codec para video overlay)
+
+**Sample rate**: 10 fps (necesario para tracking estable con ByteTrack).
+**Tracker**: ByteTrack via `model.track(persist=True)` — movido de post-MVP a MVP.
 
 ### MySQL 8 + Flyway
 
@@ -369,10 +373,12 @@ Word de 5-7 páginas con metodología, resultados y conclusiones.
 
 Aplican a todo el sistema:
 
-- NUNCA almacenar imágenes de personas
-- NUNCA reconocimiento facial ni tracking individual
-- NUNCA datos que permitan identificar individuos
+- NUNCA almacenar imágenes de personas durante el procesamiento (todo en RAM)
+- NUNCA reconocimiento facial, ni datos biométricos (edad, género, color de ropa)
+- El tracking anónimo con ByteTrack está permitido: track_id es un entero efímero dentro de la sesión de procesamiento, sin vinculación a identidad real entre sesiones
+- NUNCA guardar datos que permitan identificar individuos fuera de su sesión
+- **Política de video original**: el MP4 se almacena temporalmente, accesible solo para el dueño. El admin puede eliminarlo manualmente. Las detecciones en BD son anónimas.
 - Cumplimiento Ley 19.628 y Ley 21.719 de Chile
-- Contraseñas siempre BCrypt, nunca texto plano
+- Contraseñas siempre BCrypt strength 10, nunca texto plano
 - Tokens en variables de entorno, nunca hardcoded
 - HTTPS obligatorio en producción
