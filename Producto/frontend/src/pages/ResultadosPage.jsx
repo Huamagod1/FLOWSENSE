@@ -109,10 +109,12 @@ export default function ResultadosPage() {
       {bannerVisible && (
         <Alert
           type="info"
+          showIcon
           closable
           onClose={() => setBannerVisible(false)}
           style={{ marginBottom: 16 }}
-          message="📊 Este reporte mide exposición comercial por zona usando la métrica OTS (Opportunity To See). Cada detección equivale a 1 segundo de presencia humana. Una zona con más detecciones tiene mayor valor comercial."
+          message="Análisis de tráfico peatonal"
+          description="Este reporte mide el comportamiento real de personas usando tracking individual (ByteTrack). Las métricas principales son personas únicas (sin doble conteo), permanencia promedio por zona y flujo entre zonas. Estos datos respaldan la recomendación de precios por zona."
         />
       )}
 
