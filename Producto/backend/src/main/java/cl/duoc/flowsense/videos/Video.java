@@ -59,6 +59,9 @@ public class Video {
     @Column(name = "modelo_usado", length = 20)
     private String modeloUsado;
 
+    @Column(name = "fps_procesamiento")
+    private Integer fpsProcesamiento;
+
     @Column(name = "confianza_promedio")
     private Double confianzaPromedio;
 

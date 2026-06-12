@@ -32,15 +32,17 @@ class TestCalcularDetenidas(unittest.TestCase):
         self.assertFalse(det_f0["detenida"])
 
     def test_borde_inferior_umbral_es_detenida(self):
-        """Distancia 0.04 < 0.05 → detenida=True."""
-        dets = [_det(0, 0.5, 0.5), _det(1, 0.54, 0.5)]  # dist = 0.04
+        """Distancia 0.07 < 0.08 → detenida=True."""
+        dets = [_det(0, 0.5, 0.5), _det(1, 0.57, 0.5)]  # dist = 0.07
         resultado = calcular_detenidas(dets)
         det_f0 = next(d for d in resultado if d["frame_numero"] == 0)
         self.assertTrue(det_f0["detenida"])
 
     def test_exactamente_en_umbral_no_es_detenida(self):
-        """Distancia exactamente igual al umbral (0.05) → detenida=False (condición es <, no <=)."""
-        dets = [_det(0, 0.5, 0.5), _det(1, 0.55, 0.5)]  # dist = 0.05
+        """Distancia exactamente igual al umbral (0.08) → detenida=False (condición es <, no <=)."""
+        # 0.08 - 0.0 da exactamente 0.08 en float; otros pares (ej. 0.5→0.58) caen
+        # por debajo del umbral por redondeo y harían pasar la condición <.
+        dets = [_det(0, 0.0, 0.5), _det(1, 0.08, 0.5)]  # dist = 0.08
         resultado = calcular_detenidas(dets)
         det_f0 = next(d for d in resultado if d["frame_numero"] == 0)
         self.assertFalse(det_f0["detenida"])

@@ -6,50 +6,45 @@ import {
 
 const PRIMARY = '#7C3AED'
 
-export default function ResumenEjecutivo({ metricas, metricasTracking, zones }) {
+export default function ResumenEjecutivo({ metricas }) {
   if (!metricas?.length) return null
 
   const totalDetecciones = metricas.reduce((s, m) => s + (m.totalDetecciones || 0), 0)
-  const hayTracking = metricasTracking?.some(t => (t.personasUnicas || 0) > 0)
+  const hayTracking = metricas.some(m => (m.personasUnicas || 0) > 0)
 
   // Personas únicas: suma por zona del tracking (sobre-estima si personas cruzaron varias zonas)
   const totalPersonas = hayTracking
-    ? metricasTracking.reduce((s, t) => s + (t.personasUnicas || 0), 0)
+    ? metricas.reduce((s, m) => s + (m.personasUnicas || 0), 0)
     : 0
 
   // Permanencia promedio ponderada por zona
-  const permanenciaProm = hayTracking && metricasTracking.length
-    ? (metricasTracking.reduce((s, t) => s + (t.tiempoPermanenciaProm || 0), 0) / metricasTracking.length)
+  const zonasConPermanencia = metricas.filter(m => m.tiempoPermanenciaProm != null)
+  const permanenciaProm = hayTracking && zonasConPermanencia.length
+    ? (zonasConPermanencia.reduce((s, m) => s + m.tiempoPermanenciaProm, 0) / zonasConPermanencia.length)
     : null
 
   // Zona top por personas únicas o por detecciones si no hay tracking
   const zonaTop = hayTracking
-    ? [...metricasTracking].sort((a, b) => (b.personasUnicas || 0) - (a.personasUnicas || 0))[0]
+    ? [...metricas].sort((a, b) => (b.personasUnicas || 0) - (a.personasUnicas || 0))[0]
     : metricas.reduce((mx, m) => (m.totalDetecciones || 0) > (mx.totalDetecciones || 0) ? m : mx, metricas[0])
 
   // ── Datos para ranking por personas únicas ─────────────────────────────────
   const dataPersonas = [...metricas]
-    .map(m => {
-      const t = metricasTracking?.find(t => t.idZona === m.idZona)
-      return {
-        nombre: m.nombreZona,
-        color: m.colorHexZona || PRIMARY,
-        personas: t?.personasUnicas || 0,
-        detecciones: m.totalDetecciones || 0,
-      }
-    })
+    .map(m => ({
+      nombre: m.nombreZona,
+      color: m.colorHexZona || PRIMARY,
+      personas: m.personasUnicas || 0,
+      detecciones: m.totalDetecciones || 0,
+    }))
     .sort((a, b) => (hayTracking ? b.personas - a.personas : b.detecciones - a.detecciones))
 
   // ── Datos para ranking por permanencia ────────────────────────────────────
   const dataPermanencia = [...metricas]
-    .map(m => {
-      const t = metricasTracking?.find(t => t.idZona === m.idZona)
-      return {
-        nombre: m.nombreZona,
-        color: m.colorHexZona || PRIMARY,
-        permanencia: +(t?.tiempoPermanenciaProm || 0).toFixed(1),
-      }
-    })
+    .map(m => ({
+      nombre: m.nombreZona,
+      color: m.colorHexZona || PRIMARY,
+      permanencia: +(m.tiempoPermanenciaProm || 0).toFixed(1),
+    }))
     .sort((a, b) => b.permanencia - a.permanencia)
 
   // ── Insight automático ─────────────────────────────────────────────────────

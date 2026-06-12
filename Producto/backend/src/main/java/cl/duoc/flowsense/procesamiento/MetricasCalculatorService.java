@@ -48,6 +48,11 @@ public class MetricasCalculatorService {
         long totalFrames = contarFramesDistintos(idVideo);
         int numZonas = zonas.size();
 
+        // Sample rate del procesamiento: a 10 fps cada fila de DETECCIONES = 0.1 s
+        double fps = video.getFpsProcesamiento() != null && video.getFpsProcesamiento() > 0
+                ? video.getFpsProcesamiento()
+                : PythonOrchestratorService.FPS_PROCESAMIENTO;
+
         Map<Long, ZoneAgg> aggPorZona = obtenerAgregadosPorZona(idVideo);
         Map<Long, Integer> picoPorZona = obtenerPicoMaximoPorZona(idVideo);
 
@@ -55,6 +60,9 @@ public class MetricasCalculatorService {
         for (Zona zona : zonas) {
             ZoneAgg agg = aggPorZona.getOrDefault(zona.getId(), ZoneAgg.EMPTY);
             long totalZona = agg.total();
+
+            // ots_tracking cuenta filas (frames muestreados); dividir por fps = persona-segundos
+            double otsSegundos = agg.otsTracking() / fps;
 
             BigDecimal areaZona = zona.getAnchoNorm().multiply(zona.getAltoNorm())
                     .setScale(6, RoundingMode.HALF_UP);
@@ -74,9 +82,9 @@ public class MetricasCalculatorService {
                     .indiceValorRelativo(calcIndice(totalZona, totalVideo, numZonas))
                     .tasaDetencion(agg.tasaDetencion())
                     .personasUnicas(agg.personasUnicas() > 0 ? (int) agg.personasUnicas() : null)
-                    .otsTracking(agg.otsTracking() > 0 ? (double) agg.otsTracking() : null)
+                    .otsTracking(agg.otsTracking() > 0 ? otsSegundos : null)
                     .tiempoPermanenciaProm(agg.personasUnicas() > 0
-                            ? (double) agg.otsTracking() / agg.personasUnicas() : null)
+                            ? otsSegundos / agg.personasUnicas() : null)
                     .build();
 
             metricas.add(m);

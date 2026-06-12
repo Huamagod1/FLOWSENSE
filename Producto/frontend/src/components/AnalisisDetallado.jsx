@@ -128,7 +128,7 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
       ),
     },
     {
-      title: <ColHeader label="Detecciones" tooltip="Persona-segundos. Cada detección = 1 segundo de presencia humana." />,
+      title: <ColHeader label="Detecciones" tooltip="El sistema muestrea a 10 cuadros por segundo; los tiempos mostrados están convertidos a segundos reales." />,
       dataIndex: 'totalDetecciones', key: 'totalDetecciones',
     },
     {

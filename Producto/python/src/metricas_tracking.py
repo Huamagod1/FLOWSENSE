@@ -16,8 +16,8 @@ def calcular_personas_unicas(df_zona: pd.DataFrame) -> int:
 
 def calcular_tiempo_permanencia_promedio(df_zona: pd.DataFrame, fps: float = 1) -> float:
     """
-    Promedio de frames por track_id en la zona.
-    Con fps=1 cada frame equivale a 1 segundo.
+    Promedio de segundos por track_id en la zona: frames muestreados / fps.
+    fps es el sample rate de procesamiento (cada frame muestreado = 1/fps segundos).
     """
     valid = df_zona[df_zona["track_id"] != -1]
     if valid.empty:
@@ -100,12 +100,12 @@ def calcular_tasa_conversion(df: pd.DataFrame, zona_origen_id, zona_objetivo_id)
     return float(len(tracks_origen & tracks_objetivo) / len(tracks_origen))
 
 
-def calcular_ots_tracking(df_zona: pd.DataFrame) -> float:
+def calcular_ots_tracking(df_zona: pd.DataFrame, fps: float = 1) -> float:
     """
-    Suma de frames por track_id en la zona.
+    Persona-segundos en la zona: suma de frames muestreados por track_id / fps.
     Equivale a OTS sin doble conteo cuando una persona abandona y regresa.
     """
     valid = df_zona[df_zona["track_id"] != -1]
     if valid.empty:
         return 0.0
-    return float(valid.groupby("track_id")["frame_numero"].count().sum())
+    return float(valid.groupby("track_id")["frame_numero"].count().sum() / fps)

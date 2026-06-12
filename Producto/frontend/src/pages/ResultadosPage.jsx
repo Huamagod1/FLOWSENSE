@@ -134,11 +134,7 @@ export default function ResultadosPage() {
             key: 'resumen',
             label: 'Resumen',
             children: (
-              <ResumenEjecutivo
-                metricas={metricas}
-                metricasTracking={metricasTracking}
-                zones={zones}
-              />
+              <ResumenEjecutivo metricas={metricas} />
             ),
           },
           {

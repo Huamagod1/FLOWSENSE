@@ -99,6 +99,12 @@ def test_tiempo_permanencia_promedio_vacio():
     assert calcular_tiempo_permanencia_promedio(df) == 0.0
 
 
+def test_tiempo_permanencia_promedio_fps10(df_simple):
+    # promedio = 2 frames por track; a 10 fps cada frame = 0.1 s → 0.2 s
+    resultado = calcular_tiempo_permanencia_promedio(df_simple, fps=10)
+    assert abs(resultado - 0.2) < 1e-9
+
+
 # ── entradas y salidas ────────────────────────────────────────────────────────
 
 def test_entradas_salidas_zona1(df_simple):
@@ -144,6 +150,11 @@ def test_flujo_entre_zonas_reporta_sobre_umbral():
 def test_ots_tracking(df_simple):
     # track 1: 3, track 2: 2, track 3: 1 → total = 6
     assert calcular_ots_tracking(df_simple) == 6.0
+
+
+def test_ots_tracking_fps10(df_simple):
+    # 6 frames muestreados a 10 fps = 0.6 persona-segundos
+    assert abs(calcular_ots_tracking(df_simple, fps=10) - 0.6) < 1e-9
 
 
 def test_ots_tracking_excluye_menos_uno():

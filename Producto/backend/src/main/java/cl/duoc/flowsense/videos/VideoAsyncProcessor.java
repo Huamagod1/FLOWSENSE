@@ -109,9 +109,12 @@ public class VideoAsyncProcessor {
 
             int insertadas = csvParser.parsearYPersistir(resultado.csvPath(), video, resultado.mapaZonas());
 
-            // framesProcesados debe estar disponible antes de calcular métricas temporales
+            // framesProcesados y fps deben estar disponibles antes de calcular métricas
             video.setFramesProcesados(resultado.framesProcesados());
             video.setDeteccionesTotales(insertadas);
+            video.setFpsProcesamiento(resultado.fpsProcesamiento() != null
+                    ? resultado.fpsProcesamiento()
+                    : PythonOrchestratorService.FPS_PROCESAMIENTO);
             videoRepository.save(video);
 
             List<cl.duoc.flowsense.videos.Metrica> metricas =

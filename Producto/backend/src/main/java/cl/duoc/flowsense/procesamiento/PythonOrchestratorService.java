@@ -28,6 +28,9 @@ public class PythonOrchestratorService {
 
     private static final Logger log = LoggerFactory.getLogger(PythonOrchestratorService.class);
 
+    /** Sample rate (frames/s) que se pasa a Python; necesario para convertir frames a segundos. */
+    public static final int FPS_PROCESAMIENTO = 10;
+
     private final String pythonBin;
     private final String scriptPath;
     private final String resultsDir;
@@ -154,7 +157,7 @@ public class PythonOrchestratorService {
                 "--output", csvOutput.toAbsolutePath().toString(),
                 "--conf", conf,
                 "--modelo", modelo,
-                "--fps", "10",
+                "--fps", String.valueOf(FPS_PROCESAMIENTO),
                 "--tracker", "bytetrack"
         );
 
@@ -204,6 +207,7 @@ public class PythonOrchestratorService {
         Integer framesProcesados = null;
         Integer deteccionesTotales = null;
         Integer duracionSeg = null;
+        Integer fpsProcesamiento = null;
         TrackingData trackingData = null;
         ConfiabilidadData confiabilidadData = null;
 
@@ -218,6 +222,7 @@ public class PythonOrchestratorService {
                     if (node.has("frames_procesados")) framesProcesados = node.get("frames_procesados").asInt();
                     if (node.has("detecciones_totales")) deteccionesTotales = node.get("detecciones_totales").asInt();
                     if (node.has("duracion_seg")) duracionSeg = node.get("duracion_seg").asInt();
+                    if (node.has("fps_procesamiento")) fpsProcesamiento = node.get("fps_procesamiento").asInt();
                     trackingData = parsearTrackingData(node);
                     confiabilidadData = parsearConfiabilidad(node);
                     break;
@@ -231,8 +236,8 @@ public class PythonOrchestratorService {
 
         log.info("Detección completa para video {}: {} frames, {} detecciones",
                 video.getId(), framesProcesados, deteccionesTotales);
-        return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, csvOutput, mapaZonas,
-                trackingData, confiabilidadData);
+        return new DeteccionResult(framesProcesados, deteccionesTotales, duracionSeg, fpsProcesamiento,
+                csvOutput, mapaZonas, trackingData, confiabilidadData);
     }
 
     private TrackingData parsearTrackingData(JsonNode node) {

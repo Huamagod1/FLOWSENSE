@@ -195,7 +195,7 @@ def main():
             calcular_velocidad_flujo_promedio,
         )
         personas_unicas_total = int(df_det[df_det["track_id"] != -1]["track_id"].nunique())
-        permanencia_global = calcular_tiempo_permanencia_promedio(df_det)
+        permanencia_global = calcular_tiempo_permanencia_promedio(df_det, fps=args.fps)
         flujo_zonas = calcular_flujo_entre_zonas(df_det)
 
         metricas_por_zona_json = {}
@@ -205,11 +205,11 @@ def main():
             es = calcular_entradas_salidas(df_det, zid)
             metricas_por_zona_json[str(zid)] = {
                 "personas_unicas": calcular_personas_unicas(df_z),
-                "tiempo_permanencia_promedio": round(calcular_tiempo_permanencia_promedio(df_z), 2),
+                "tiempo_permanencia_promedio": round(calcular_tiempo_permanencia_promedio(df_z, fps=args.fps), 2),
                 "entradas": es["entradas"],
                 "salidas": es["salidas"],
-                "ots_tracking": calcular_ots_tracking(df_z),
-                "velocidad_flujo_promedio": round(calcular_velocidad_flujo_promedio(df_z), 6),
+                "ots_tracking": round(calcular_ots_tracking(df_z, fps=args.fps), 2),
+                "velocidad_flujo_promedio": round(calcular_velocidad_flujo_promedio(df_z, fps=args.fps), 6),
             }
 
     # Confiabilidad, eventos y video overlay
@@ -247,6 +247,7 @@ def main():
     imprimir_resumen(
         frames_procesados, detecciones_totales, duracion_video_seg,
         aborted_by_user=aborted_by_user,
+        fps_procesamiento=args.fps,
         detecciones_detenidas=det_detenidas,
         tasa_detencion_global=tasa,
         modelo_usado=args.modelo,

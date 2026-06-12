@@ -31,7 +31,8 @@ def imprimir_resumen(frames, detecciones, duracion_video_seg, status="OK", mensa
                      metricas_por_zona=None,
                      video_overlay_path=None,
                      confiabilidad=None,
-                     eventos_count=0):
+                     eventos_count=0,
+                     fps_procesamiento=None):
     """Imprime en stdout la línea JSON que Spring Boot captura al terminar el proceso."""
     resumen = {
         "frames_procesados": frames,
@@ -42,6 +43,8 @@ def imprimir_resumen(frames, detecciones, duracion_video_seg, status="OK", mensa
         "modelo_usado": modelo_usado,
         "status": status,
     }
+    if fps_procesamiento is not None:
+        resumen["fps_procesamiento"] = fps_procesamiento
     if personas_unicas_total is not None:
         resumen["personas_unicas_total"] = personas_unicas_total
     if tiempo_permanencia_promedio_global is not None:

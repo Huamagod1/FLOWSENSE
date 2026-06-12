@@ -82,6 +82,11 @@ public class TrackingMetricsService {
     // ── Internos ─────────────────────────────────────────────────────────────
 
     private void persistirTracks(Video video, Long idVideo) {
+        // Sample rate del procesamiento: frames muestreados / fps = segundos reales
+        double fps = video.getFpsProcesamiento() != null && video.getFpsProcesamiento() > 0
+                ? video.getFpsProcesamiento()
+                : PythonOrchestratorService.FPS_PROCESAMIENTO;
+
         List<Track> tracks = new ArrayList<>();
 
         jdbcTemplate.query(
@@ -101,7 +106,7 @@ public class TrackingMetricsService {
                         .primerFrame(rs.getInt("primer_frame"))
                         .ultimoFrame(rs.getInt("ultimo_frame"))
                         .framesTotal(rs.getInt("frames_total"))
-                        .segundosTotal((double) rs.getInt("frames_total"))
+                        .segundosTotal(rs.getInt("frames_total") / fps)
                         .build()),
                 idVideo);
 
