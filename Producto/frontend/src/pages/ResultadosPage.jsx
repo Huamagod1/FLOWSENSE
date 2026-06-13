@@ -6,7 +6,7 @@ import { usePolling } from '../hooks/usePolling'
 import TrayectoriasCanvas from '../components/TrayectoriasCanvas'
 import FlujoSankeyChart from '../components/FlujoSankeyChart'
 import MetricasTrackingPanel from '../components/MetricasTrackingPanel'
-import { getTracks, getFlujoZonas, getMetricasTracking } from '../api/tracking'
+import { getTracks, getFlujoZonas, getMetricasTracking, getTrayectorias } from '../api/tracking'
 import VideoValidacion from '../components/VideoValidacion'
 import ResumenEjecutivo from '../components/ResumenEjecutivo'
 import RecomendacionPrecio from '../components/RecomendacionPrecio'
@@ -25,6 +25,7 @@ export default function ResultadosPage() {
   const [bannerVisible, setBannerVisible] = useState(true)
   const [zones, setZones] = useState([])
   const [tracks, setTracks] = useState([])
+  const [trayectorias, setTrayectorias] = useState([])
   const [flujoZonas, setFlujoZonas] = useState([])
   const [metricasTracking, setMetricasTracking] = useState([])
   const [confiabilidad, setConfiabilidad] = useState(null)
@@ -54,6 +55,7 @@ export default function ResultadosPage() {
     api.get(`/videos/${id}/metricas-temporales`).then(r => setMetricasTemporales(r.data || [])).catch(() => {})
     api.get(`/videos/${id}/zonas`).then(r => setZones(r.data || [])).catch(() => {})
     getTracks(id).then(r => setTracks(r.data || [])).catch(() => {})
+    getTrayectorias(id).then(r => setTrayectorias(r.data || [])).catch(() => {})
     getFlujoZonas(id).then(r => setFlujoZonas(r.data || [])).catch(() => {})
     getMetricasTracking(id).then(r => setMetricasTracking(r.data || [])).catch(() => {})
     getConfiabilidad(id).then(r => setConfiabilidad(r.data)).catch(() => {})
@@ -114,7 +116,7 @@ export default function ResultadosPage() {
           onClose={() => setBannerVisible(false)}
           style={{ marginBottom: 16 }}
           message="Análisis de tráfico peatonal"
-          description="Este reporte mide el comportamiento real de personas usando tracking individual (ByteTrack). Las métricas principales son personas únicas (sin doble conteo), permanencia promedio por zona y flujo entre zonas. Estos datos respaldan la recomendación de precios por zona."
+          description="Este reporte combina dos mediciones: el número de personas detectadas con tracking individual (ByteTrack) y el tiempo de exposición comercial (persona-segundos). Cada zona cuenta sus propias personas; una misma persona puede aparecer en más de una zona. Estos datos respaldan la recomendación de precios."
         />
       )}
 
@@ -168,7 +170,7 @@ export default function ResultadosPage() {
                       Trayectorias y zonas
                     </h3>
                     <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
-                      Las burbujas muestran el número de personas únicas por zona. Las flechas indican flujo entre zonas.
+                      Cada línea es el recorrido real de una persona (verde = inicio, rojo = fin). Las burbujas indican personas únicas por zona; las flechas, cuando aparecen, muestran el flujo entre zonas.
                     </p>
                     <TrayectoriasCanvas
                       frameSrc={frameSrc}
@@ -176,6 +178,7 @@ export default function ResultadosPage() {
                       metricas={metricas}
                       flujoZonas={flujoZonas}
                       tracks={tracks}
+                      trayectorias={trayectorias}
                     />
                   </Card>
                 </div>

@@ -83,11 +83,11 @@ export default function MetricasTrackingPanel({ metricas = [], metricasTracking 
         <Col xs={24} sm={12} lg={6}>
           <Card style={{ borderRadius: 8, borderTop: `3px solid ${PRIMARY}` }}>
             <Statistic
-              title="Personas únicas totales"
+              title="Personas únicas (suma por zona)"
               value={totalPersonasUnicas || '—'}
               valueStyle={{ color: PRIMARY, fontWeight: 700 }}
             />
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>sin doble conteo (ByteTrack)</p>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>suma por zona — una persona en 2 zonas cuenta en ambas</p>
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -114,11 +114,11 @@ export default function MetricasTrackingPanel({ metricas = [], metricasTracking 
         <Col xs={24} sm={12} lg={6}>
           <Card style={{ borderRadius: 8, borderTop: '3px solid #0ea5e9' }}>
             <Statistic
-              title="OTS sin doble conteo"
+              title="OTS total (tracking)"
               value={totalOts > 0 ? Math.round(totalOts) : '—'}
               valueStyle={{ color: '#0ea5e9', fontWeight: 700 }}
             />
-            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>persona-segundos únicos</p>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>persona-segundos con tracking</p>
           </Card>
         </Col>
       </Row>

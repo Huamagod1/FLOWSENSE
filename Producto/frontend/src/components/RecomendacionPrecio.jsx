@@ -16,7 +16,7 @@ function justificacion(m, avgDet) {
   const ratio = avgDet > 0 ? m.totalDetecciones / avgDet : 1
   const tasa  = m.tasaDetencion != null ? m.tasaDetencion * 100 : null
   if (ratio >= 1.5 && tasa != null && tasa >= 40)
-    return 'Alto tráfico + alta permanencia. Zona destino — premium justificado.'
+    return 'Alto tráfico + alta tasa de detención. Zona de interés — premium justificado.'
   if (ratio >= 1.5)
     return 'Buena exposición, tráfico sobre el promedio del recinto.'
   if (ratio >= 0.8)

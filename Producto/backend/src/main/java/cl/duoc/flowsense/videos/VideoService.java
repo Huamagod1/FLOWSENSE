@@ -11,6 +11,7 @@ import cl.duoc.flowsense.videos.dto.EstadoVideoResponse;
 import cl.duoc.flowsense.videos.dto.EventoDto;
 import cl.duoc.flowsense.videos.dto.EventosResponse;
 import cl.duoc.flowsense.videos.dto.FramePreviewResponse;
+import cl.duoc.flowsense.videos.dto.TrayectoriaDto;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +28,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -152,6 +155,28 @@ public class VideoService {
 
         videoRepository.delete(video);
         log.info("Video {} eliminado (org {})", idVideo, idOrg);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrayectoriaDto> listarTrayectorias(Long idVideo, Long idOrg) {
+        videoRepository.findByIdAndRecintoOrganizacionId(idVideo, idOrg)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Video no encontrado"));
+
+        List<Object[]> rows = deteccionRepository.findTrayectoriasRawByVideoId(idVideo);
+
+        // Filas ordenadas por track_id, frame_numero: se agrupan por track
+        // preservando el orden temporal del recorrido.
+        Map<Integer, List<TrayectoriaDto.PuntoTrayectoria>> porTrack = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            Integer trackId = ((Number) row[0]).intValue();
+            TrayectoriaDto.PuntoTrayectoria punto =
+                    new TrayectoriaDto.PuntoTrayectoria(toBigDecimal(row[1]), toBigDecimal(row[2]));
+            porTrack.computeIfAbsent(trackId, k -> new ArrayList<>()).add(punto);
+        }
+
+        return porTrack.entrySet().stream()
+                .map(e -> new TrayectoriaDto(e.getKey(), e.getValue()))
+                .toList();
     }
 
     private BigDecimal toBigDecimal(Object val) {

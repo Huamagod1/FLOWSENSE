@@ -1,0 +1,621 @@
+# ResultadosPage.jsx
+
+```jsx
+import { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { Spin, Alert, Tabs, Card } from 'antd'
+import api from '../api/axiosConfig'
+import { usePolling } from '../hooks/usePolling'
+import TrayectoriasCanvas from '../components/TrayectoriasCanvas'
+import FlujoSankeyChart from '../components/FlujoSankeyChart'
+import MetricasTrackingPanel from '../components/MetricasTrackingPanel'
+import { getTracks, getFlujoZonas, getMetricasTracking } from '../api/tracking'
+import VideoValidacion from '../components/VideoValidacion'
+import ResumenEjecutivo from '../components/ResumenEjecutivo'
+import RecomendacionPrecio from '../components/RecomendacionPrecio'
+import AnalisisDetallado from '../components/AnalisisDetallado'
+import { getConfiabilidad } from '../api/validacion'
+
+export default function ResultadosPage() {
+  const { id } = useParams()
+
+  const [estado, setEstado] = useState('PROCESANDO')
+  const [mensajeError, setMensajeError] = useState('')
+  const [detecciones, setDetecciones] = useState([])
+  const [metricas, setMetricas] = useState([])
+  const [metricasTemporales, setMetricasTemporales] = useState([])
+  const [frameSrc, setFrameSrc] = useState(null)
+  const [bannerVisible, setBannerVisible] = useState(true)
+  const [zones, setZones] = useState([])
+  const [tracks, setTracks] = useState([])
+  const [flujoZonas, setFlujoZonas] = useState([])
+  const [metricasTracking, setMetricasTracking] = useState([])
+  const [confiabilidad, setConfiabilidad] = useState(null)
+  const [activeTab, setActiveTab] = useState('validacion')
+
+  const pollingActivo = estado !== 'COMPLETADO' && estado !== 'ERROR'
+
+  async function consultarEstado() {
+    try {
+      const res = await api.get(`/videos/${id}/estado`)
+      setEstado(res.data.estado)
+      if (res.data.estado === 'ERROR')
+        setMensajeError(res.data.mensajeError || res.data.mensaje_error || 'Error en el análisis')
+    } catch {
+      setMensajeError('No se pudo consultar el estado del análisis')
+      setEstado('ERROR')
+    }
+  }
+
+  usePolling(consultarEstado, 3000, pollingActivo)
+  useEffect(() => { consultarEstado() }, [id])
+
+  useEffect(() => {
+    if (estado !== 'COMPLETADO') return
+    api.get(`/videos/${id}/detecciones`).then(r => setDetecciones(r.data || [])).catch(() => {})
+    api.get(`/videos/${id}/metricas`).then(r => setMetricas(r.data || [])).catch(() => {})
+    api.get(`/videos/${id}/metricas-temporales`).then(r => setMetricasTemporales(r.data || [])).catch(() => {})
+    api.get(`/videos/${id}/zonas`).then(r => setZones(r.data || [])).catch(() => {})
+    getTracks(id).then(r => setTracks(r.data || [])).catch(() => {})
+    getFlujoZonas(id).then(r => setFlujoZonas(r.data || [])).catch(() => {})
+    getMetricasTracking(id).then(r => setMetricasTracking(r.data || [])).catch(() => {})
+    getConfiabilidad(id).then(r => setConfiabilidad(r.data)).catch(() => {})
+  }, [estado, id])
+
+  useEffect(() => {
+    if (estado !== 'COMPLETADO') return
+    let url = null
+    api.get(`/videos/${id}/frame-preview/imagen`, { responseType: 'blob' })
+      .then(r => { url = URL.createObjectURL(r.data); setFrameSrc(url) })
+      .catch(() => {})
+    return () => { if (url) URL.revokeObjectURL(url) }
+  }, [estado, id])
+
+  if (estado === 'ERROR') {
+    return (
+      <div className="page">
+        <div className="page-header"><h2>Resultados del análisis</h2></div>
+        <div className="alert alert-error">{mensajeError || 'Error en el análisis'}</div>
+        <Link to="/app" className="btn btn-ghost" style={{ marginTop: 16 }}>Volver al inicio</Link>
+      </div>
+    )
+  }
+
+  if (pollingActivo) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <h2>Resultados del análisis</h2>
+          <p className="text-muted">Video ID: {id}</p>
+        </div>
+        <div className="spinner-wrap" style={{ flexDirection: 'column', gap: 16, padding: '80px 0' }}>
+          <Spin size="large" />
+          <p className="text-muted">Analizando video... Por favor espera.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h2 style={{ margin: 0 }}>Resultados del análisis</h2>
+          <p className="text-muted" style={{ margin: 0 }}>Video ID: {id}</p>
+        </div>
+      </div>
+
+      {mensajeError && (
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>{mensajeError}</div>
+      )}
+
+      {bannerVisible && (
+        <Alert
+          type="info"
+          showIcon
+          closable
+          onClose={() => setBannerVisible(false)}
+          style={{ marginBottom: 16 }}
+          message="Análisis de tráfico peatonal"
+          description="Este reporte mide el comportamiento real de personas usando tracking individual (ByteTrack). Las métricas principales son personas únicas (sin doble conteo), permanencia promedio por zona y flujo entre zonas. Estos datos respaldan la recomendación de precios por zona."
+        />
+      )}
+
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        destroyInactiveTabPane={false}
+        items={[
+          {
+            key: 'validacion',
+            label: 'Validación del análisis',
+            children: (
+              <VideoValidacion videoId={id} confiabilidad={confiabilidad} />
+            ),
+          },
+          {
+            key: 'resumen',
+            label: 'Resumen',
+            children: (
+              <ResumenEjecutivo
+                metricas={metricas}
+                metricasTracking={metricasTracking}
+                zones={zones}
+              />
+            ),
+          },
+          {
+            key: 'precio',
+            label: 'Recomendación de precio',
+            children: (
+              <RecomendacionPrecio metricas={metricas} videoId={id} />
+            ),
+          },
+          {
+            key: 'detalle',
+            label: 'Análisis detallado',
+            children: (
+              <AnalisisDetallado
+                metricas={metricas}
+                metricasTemporales={metricasTemporales}
+                detecciones={detecciones}
+                frameSrc={frameSrc}
+                zones={zones}
+              />
+            ),
+          },
+          {
+            key: 'flujo',
+            label: 'Flujo y trayectorias',
+            children: (
+              <div>
+                <div className="section">
+                  <Card>
+                    <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#111827' }}>
+                      Trayectorias y zonas
+                    </h3>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280' }}>
+                      Las burbujas muestran el número de personas únicas por zona. Las flechas indican flujo entre zonas.
+                    </p>
+                    <TrayectoriasCanvas
+                      frameSrc={frameSrc}
+                      zones={zones}
+                      metricas={metricas}
+                      flujoZonas={flujoZonas}
+                      tracks={tracks}
+                    />
+                  </Card>
+                </div>
+
+                {flujoZonas.length > 0 && (
+                  <div className="section">
+                    <Card>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#111827' }}>
+                        Flujo entre zonas
+                      </h3>
+                      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
+                        Trayectorias que conectan zonas distintas. Identifica rutas de circulación frecuentes.
+                      </p>
+                      <FlujoSankeyChart flujoZonas={flujoZonas} zones={zones} />
+                    </Card>
+                  </div>
+                )}
+
+                <div className="section">
+                  <MetricasTrackingPanel
+                    metricas={metricas}
+                    metricasTracking={metricasTracking}
+                    zones={zones}
+                  />
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
+    </div>
+  )
+}
+```
+
+---
+
+# DashboardPage.jsx
+
+```jsx
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../api/axiosConfig'
+import { useAuth } from '../hooks/useAuth'
+
+export default function DashboardPage() {
+  const { usuario } = useAuth()
+  const [recintos, setRecintos] = useState([])
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    api.get('/recintos')
+      .then(res => setRecintos(res.data))
+      .catch(() => {})
+      .finally(() => setCargando(false))
+  }, [])
+
+  const recientes = recintos.slice(0, 5)
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h2>Bienvenido, {usuario?.nombre}</h2>
+          <p className="text-muted">Panel de control FlowSense</p>
+        </div>
+        <Link to="/app/recintos" className="btn btn-primary">+ Nuevo recinto</Link>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-value">{recintos.length}</div>
+          <div className="stat-label">Total recintos</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">—</div>
+          <div className="stat-label">Análisis completados</div>
+        </div>
+      </div>
+
+      <div className="section">
+        <h3 className="section-title">Recintos recientes</h3>
+        {cargando ? (
+          <div className="spinner-wrap"><div className="spinner" /></div>
+        ) : recientes.length === 0 ? (
+          <div className="empty-state">
+            <p>Aún no tienes recintos. <Link to="/app/recintos" className="link">Crea el primero.</Link></p>
+          </div>
+        ) : (
+          <div className="card-list">
+            {recientes.map(r => (
+              <Link key={r.id} to={`/app/recintos/${r.id}`} className="card-item">
+                <div className="card-item-main">
+                  <strong>{r.nombre}</strong>
+                  <span className="badge">{r.tipo}</span>
+                </div>
+                <span className="card-item-sub">{r.direccion}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+# index.css
+
+```css
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #aa3bff;
+  --primary-dark: #8a2fd4;
+  --primary-light: rgba(170, 59, 255, 0.12);
+  --bg: #f8f9fb;
+  --bg-card: #ffffff;
+  --text: #374151;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+  --danger: #ef4444;
+  --success: #22c55e;
+  --info: #3b82f6;
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  text-align: left;
+  border: none;
+  margin: 0;
+  max-width: 100%;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; }
+
+/* ── Layout ── */
+.layout { display: flex; flex-direction: column; min-height: 100vh; }
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-brand { display: flex; align-items: center; gap: 8px; }
+.navbar-logo { font-size: 22px; color: var(--primary); }
+.navbar-title { font-size: 17px; font-weight: 600; color: #111; }
+.navbar-user { display: flex; align-items: center; gap: 12px; }
+.navbar-username { font-size: 14px; color: var(--text-muted); }
+
+.layout-body { display: flex; flex: 1; }
+
+.sidebar {
+  width: 200px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  flex-shrink: 0;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.sidebar-link:hover { color: var(--primary); background: var(--primary-light); }
+.sidebar-link.active { color: var(--primary); background: var(--primary-light); border-left-color: var(--primary); }
+
+.main-content { flex: 1; padding: 28px 32px; min-width: 0; }
+
+/* ── Page ── */
+.page { max-width: 1100px; }
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
+}
+.page-header h2 { font-size: 22px; font-weight: 600; color: #111; margin-bottom: 4px; }
+
+.breadcrumb { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.section { margin-bottom: 32px; }
+.section-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 14px; }
+
+/* ── Auth ── */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8f4ff 0%, #f0f4ff 100%);
+  padding: 24px;
+}
+
+.auth-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--border);
+}
+
+.auth-header { text-align: center; margin-bottom: 28px; }
+.auth-logo { font-size: 36px; color: var(--primary); }
+.auth-title { font-size: 24px; font-weight: 700; color: #111; margin: 8px 0 4px; }
+.auth-subtitle { color: var(--text-muted); font-size: 14px; }
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
+.auth-footer { text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 20px; }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Fields ── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 13px; font-weight: 500; color: #374151; }
+
+.field-input {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+.field-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.field-input.error { border-color: var(--danger); }
+.field-error { font-size: 12px; color: var(--danger); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); color: var(--text); }
+.btn-sm { padding: 5px 12px; font-size: 13px; }
+.btn-full { width: 100%; }
+
+/* ── Alerts ── */
+.alert {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+.alert-error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.alert-info { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.stat-value { font-size: 32px; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Card list ── */
+.card-list { display: flex; flex-direction: column; gap: 8px; }
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s;
+}
+.card-item:hover { border-color: var(--primary); }
+.card-item-main { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.card-item-sub { font-size: 13px; color: var(--text-muted); }
+
+/* ── Card ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+/* ── Badge / Tag ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* ── Link ── */
+.link { color: var(--primary); text-decoration: underline; }
+.link:hover { color: var(--primary-dark); }
+
+/* ── Text ── */
+.text-muted { color: var(--text-muted); }
+
+/* ── Spinner ── */
+.spinner-wrap { display: flex; align-items: center; justify-content: center; padding: 48px; }
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Table actions ── */
+.table-actions { display: flex; gap: 8px; }
+
+/* ── Upload ── */
+.upload-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.upload-area:hover { border-color: var(--primary); background: var(--primary-light); }
+.upload-icon { font-size: 32px; margin-bottom: 10px; }
+.upload-file-info { font-size: 14px; color: var(--text); }
+.upload-file-name { font-weight: 600; margin-bottom: 4px; word-break: break-all; }
+.upload-file-size { font-size: 13px; color: var(--text-muted); }
+.upload-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.upload-status { text-align: center; padding: 24px; }
+.upload-status-text { font-size: 15px; color: var(--text-muted); margin-top: 8px; }
+
+/* ── Progress ── */
+.progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.2s; }
+
+/* ── Editor ── */
+.editor-layout { display: flex; gap: 24px; align-items: flex-start; }
+.editor-canvas-wrap { flex-shrink: 0; }
+.editor-sidebar {
+  flex: 1;
+  min-width: 220px;
+  max-width: 260px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.zona-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.zona-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.zona-item:hover { border-color: var(--border); background: var(--bg); }
+.zona-item.active { border-color: var(--primary); background: var(--primary-light); }
+.zona-color { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+.zona-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zona-delete { color: var(--text-muted); font-size: 18px; line-height: 1; padding: 0 2px; }
+.zona-delete:hover { color: var(--danger); }
+.zona-editor-panel { border-top: 1px solid var(--border); padding-top: 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+.editor-actions { border-top: 1px solid var(--border); padding-top: 14px; }
+
+/* ── Ant Design table row highlight ── */
+.row-highlight-green td { background: #f0fdf4 !important; }
+.row-highlight-red td { background: #fef2f2 !important; }
+
+/* ── Empty state ── */
+.empty-state { padding: 32px; text-align: center; color: var(--text-muted); font-size: 14px; }
+```

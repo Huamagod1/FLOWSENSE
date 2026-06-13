@@ -21,6 +21,12 @@ public interface DeteccionRepository extends JpaRepository<Deteccion, Long> {
            nativeQuery = true)
     List<Object[]> findHeatmapRawByVideoId(@Param("idVideo") Long idVideo);
 
+    @Query(value = "SELECT track_id, x_centro_norm, y_centro_norm, frame_numero " +
+                   "FROM DETECCIONES WHERE id_video = :idVideo AND track_id <> -1 " +
+                   "ORDER BY track_id, frame_numero",
+           nativeQuery = true)
+    List<Object[]> findTrayectoriasRawByVideoId(@Param("idVideo") Long idVideo);
+
     @Transactional
     @Modifying
     @Query(value = "DELETE FROM DETECCIONES WHERE id_video = :idVideo", nativeQuery = true)

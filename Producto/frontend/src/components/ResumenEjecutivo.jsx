@@ -59,7 +59,7 @@ export default function ResumenEjecutivo({ metricas }) {
 
   // ── Narrativa ─────────────────────────────────────────────────────────────
   const narrativa = hayTracking
-    ? `Tu recinto registró ${totalPersonas} persona${totalPersonas !== 1 ? 's' : ''} única${totalPersonas !== 1 ? 's' : ''} distribuidas en ${metricas.length} zona${metricas.length !== 1 ? 's' : ''}. La zona de mayor tráfico fue "${zonaTop?.nombreZona}"${permanenciaProm != null ? ` con una permanencia promedio de ${permanenciaProm.toFixed(1)} segundos por visita` : ''}.`
+    ? `Tu recinto registró ${totalPersonas} persona${totalPersonas !== 1 ? 's' : ''} única${totalPersonas !== 1 ? 's' : ''} sumando todas las zonas (una persona puede aparecer en más de una zona), repartidas en ${metricas.length} zona${metricas.length !== 1 ? 's' : ''}. La zona de mayor tráfico fue "${zonaTop?.nombreZona}"${permanenciaProm != null ? ` con una permanencia promedio de ${permanenciaProm.toFixed(1)} segundos por visita` : ''}.`
     : `Tu recinto registró ${totalDetecciones} persona-segundos de exposición en ${metricas.length} zona${metricas.length !== 1 ? 's' : ''}. La zona más activa fue "${zonaTop?.nombreZona}".`
 
   const barHeight = Math.max(100, metricas.length * 44)
@@ -81,7 +81,7 @@ export default function ResumenEjecutivo({ metricas }) {
               valueStyle={{ color: '#3b82f6', fontWeight: 700 }}
             />
             <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>
-              {hayTracking ? 'identificadas por tracking' : 'OTS total del recinto'}
+              {hayTracking ? 'suma por zona (tracking)' : 'OTS total del recinto'}
             </p>
           </Card>
         </Col>

@@ -20,6 +20,7 @@ import cl.duoc.flowsense.videos.dto.PrecioSugeridoRequest;
 import cl.duoc.flowsense.videos.dto.PrecioSugeridoZona;
 import cl.duoc.flowsense.videos.dto.ResumenAnalisisResponse;
 import cl.duoc.flowsense.videos.dto.TrackDto;
+import cl.duoc.flowsense.videos.dto.TrayectoriaDto;
 import cl.duoc.flowsense.videos.dto.VideoResponse;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -154,6 +155,12 @@ public class VideoQueryController {
     public ResponseEntity<List<TrackDto>> tracks(@PathVariable Long id) {
         videoService.obtener(id, currentUser.getIdOrganizacion());
         return ResponseEntity.ok(trackingMetricsService.listarTracks(id));
+    }
+
+    @GetMapping("/{id}/trayectorias")
+    public ResponseEntity<List<TrayectoriaDto>> trayectorias(@PathVariable Long id) {
+        return ResponseEntity.ok(
+                videoService.listarTrayectorias(id, currentUser.getIdOrganizacion()));
     }
 
     @GetMapping("/{id}/flujo-zonas")

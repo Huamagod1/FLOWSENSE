@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Table, Card, Row, Col, Progress,
-  Tooltip as AntTooltip,
+  Tooltip as AntTooltip, Collapse,
 } from 'antd'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -36,12 +36,35 @@ function InfoIcon() {
   )
 }
 
-function getHeatColor(normalized) {
-  if (normalized <= 0.2) return { r: 59,  g: 130, b: 246, a: 0.3 }
-  if (normalized <= 0.4) return { r: 6,   g: 182, b: 212, a: 0.5 }
-  if (normalized <= 0.6) return { r: 250, g: 204, b: 21,  a: 0.7 }
-  if (normalized <= 0.8) return { r: 249, g: 115, b: 22,  a: 0.8 }
-  return                        { r: 220, g: 38,  b: 38,  a: 0.9 }
+// Paleta continua tipo heatmap: azul → cyan → verde → amarillo → naranja → rojo
+const HEAT_STOPS = [
+  { t: 0.0,  c: [59,  130, 246] }, // azul   (bajo)
+  { t: 0.25, c: [6,   182, 212] }, // cyan
+  { t: 0.45, c: [16,  185, 129] }, // verde
+  { t: 0.65, c: [250, 204, 21]  }, // amarillo
+  { t: 0.82, c: [249, 115, 22]  }, // naranja
+  { t: 1.0,  c: [220, 38,  38]  }, // rojo   (alto)
+]
+
+// Mapea una intensidad normalizada [0-1] a un color de la paleta + alpha
+function heatColorFromIntensity(t) {
+  const v = Math.max(0, Math.min(1, t))
+  let lo = HEAT_STOPS[0]
+  let hi = HEAT_STOPS[HEAT_STOPS.length - 1]
+  for (let i = 0; i < HEAT_STOPS.length - 1; i++) {
+    if (v >= HEAT_STOPS[i].t && v <= HEAT_STOPS[i + 1].t) {
+      lo = HEAT_STOPS[i]
+      hi = HEAT_STOPS[i + 1]
+      break
+    }
+  }
+  const span = (hi.t - lo.t) || 1
+  const f = (v - lo.t) / span
+  const r = Math.round(lo.c[0] + (hi.c[0] - lo.c[0]) * f)
+  const g = Math.round(lo.c[1] + (hi.c[1] - lo.c[1]) * f)
+  const b = Math.round(lo.c[2] + (hi.c[2] - lo.c[2]) * f)
+  const a = Math.round(Math.min(1, 0.35 + v * 0.55) * 255) // más opaco donde más caliente
+  return { r, g, b, a }
 }
 
 function ColHeader({ label, tooltip }) {
@@ -204,9 +227,11 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
     return items
   })()
 
-  // ── Heatmap canvas — escala por personas únicas por zona ─────────────────
+  // ── Heatmap canvas — densidad real de puntos de detección ────────────────
+  // Dos pasadas: (1) acumular intensidad en escala de grises con additive
+  // blending; (2) remapear el alpha acumulado a la paleta de colores heatmap.
   useEffect(() => {
-    if (!imgLoaded || !canvasRef.current || !metricas.length || !zones.length) return
+    if (!imgLoaded || !canvasRef.current || !detecciones.length) return
     const canvas = canvasRef.current
     const img    = imgRef.current
     if (!img) return
@@ -217,39 +242,59 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    const metricaMap = {}
-    metricas.forEach(m => { metricaMap[m.idZona] = m })
+    // ── Pasada 1: acumular densidad ──────────────────────────────────────
+    // Cada punto pinta un gradiente radial negro semitransparente. Con
+    // globalCompositeOperation 'lighter' los puntos cercanos suman su alpha,
+    // así las áreas con más detecciones quedan más opacas.
+    const radius = 18
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    detecciones.forEach(d => {
+      const x = Number(d.x) * canvas.width
+      const y = Number(d.y) * canvas.height
+      if (!isFinite(x) || !isFinite(y)) return
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
+      gradient.addColorStop(0, 'rgba(0,0,0,0.18)')
+      gradient.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = gradient
+      ctx.beginPath()
+      ctx.arc(x, y, radius, 0, Math.PI * 2)
+      ctx.fill()
+    })
+    ctx.restore()
 
-    const values = zones.map(z => metricaMap[z.id]?.personasUnicas ?? 0)
-    const minVal = Math.min(...values)
-    const maxVal = Math.max(...values)
-    const range  = maxVal - minVal
-    const normalize = v => range === 0 ? 0.5 : (v - minVal) / range
-
+    // ── Pasada 2: remapear intensidad acumulada (alpha) a colores ────────
     try {
-      zones.forEach(z => {
-        const cx  = (z.xNorm + z.anchoNorm / 2) * canvas.width
-        const cy  = (z.yNorm + z.altoNorm  / 2) * canvas.height
-        if (!isFinite(cx) || !isFinite(cy)) return
-        const val = metricaMap[z.id]?.personasUnicas ?? 0
-        const n   = normalize(val)
-        const { r, g, b, a } = getHeatColor(n)
-        const radioBase = Math.min(z.anchoNorm, z.altoNorm) * 0.4
-        const radiusPx  = radioBase * Math.min(canvas.width, canvas.height)
-        const radius    = radiusPx * (0.6 + n * 0.4)
-        if (!isFinite(radius) || radius <= 0) return
-        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
-        gradient.addColorStop(0, `rgba(${r},${g},${b},${a})`)
-        gradient.addColorStop(1, `rgba(${r},${g},${b},0)`)
-        ctx.fillStyle = gradient
-        ctx.beginPath()
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-        ctx.fill()
-      })
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data  = image.data
+
+      // Normalizar contra el percentil 85 (no el máximo absoluto) para que el
+      // rojo se reserve a los puntos realmente más densos y la paleta se
+      // distribuya mejor. Los valores por encima del percentil se clampean a 1.
+      const alphas = []
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) alphas.push(data[i])
+      }
+      if (alphas.length === 0) return
+      alphas.sort((p, q) => p - q)
+      const refAlpha = alphas[Math.floor(alphas.length * 0.85)] || alphas[alphas.length - 1]
+      if (refAlpha === 0) return
+
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3]
+        if (alpha === 0) continue
+        const { r, g, b, a } = heatColorFromIntensity(alpha / refAlpha)
+        data[i]     = r
+        data[i + 1] = g
+        data[i + 2] = b
+        data[i + 3] = a
+      }
+      ctx.putImageData(image, 0, 0)
     } catch {
-      // Error en canvas: el frame se muestra sin heatmap superpuesto
+      // getImageData puede fallar (canvas "tainted"): el frame se muestra
+      // con la capa de densidad en gris, sin el remapeo de color.
     }
-  }, [imgLoaded, metricas, zones])
+  }, [imgLoaded, detecciones])
 
   function renderBarLabel({ x, y, width, height, value, index }) {
     const m = rankingData[index]
@@ -518,6 +563,28 @@ export default function AnalisisDetallado({ metricas, metricasTemporales, detecc
           </Card>
         </div>
       )}
+
+      {/* ── Nota metodológica ─────────────────────────────────────────── */}
+      <div className="section">
+        <Collapse
+          ghost
+          items={[
+            {
+              key: 'metodologia',
+              label: <span style={{ fontSize: 13, color: '#6b7280' }}>ⓘ Nota metodológica</span>,
+              children: (
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.9, color: '#374151' }}>
+                  <li><b>Personas únicas:</b> número de individuos distintos detectados con tracking anónimo (ByteTrack). Se cuentan por zona; una persona que recorre dos zonas suma en ambas.</li>
+                  <li><b>Persona-segundos (OTS):</b> tiempo total de exposición. El sistema muestrea a 10 cuadros por segundo; los tiempos se convierten a segundos reales.</li>
+                  <li><b>Tasa de detención:</b> porcentaje de detecciones donde la persona estaba prácticamente quieta. Indica interés (vitrinas) frente a paso.</li>
+                  <li><b>Score compuesto:</b> índice de valor comercial relativo al promedio del recinto, combinando tráfico (40%), detención (30%), densidad (20%) y consistencia (10%).</li>
+                  <li><b>Precio sugerido:</b> precio base × score. Es orientativo; la decisión final es del administrador.</li>
+                </ul>
+              ),
+            },
+          ]}
+        />
+      </div>
     </div>
   )
 }

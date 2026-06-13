@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const PRIMARY = '#7C3AED'
 
-export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = [], flujoZonas = [], tracks = [] }) {
+export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = [], flujoZonas = [], tracks = [], trayectorias = [] }) {
   const canvasRef    = useRef()
   const imgRef       = useRef()
   const containerRef = useRef()
@@ -112,46 +112,49 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
       }
     }
 
-    // Trayectorias individuales: arcos bezier entre zona inicio y zona fin por track
-    const tracksMovimiento = tracks.filter(t =>
-      t.zonaInicioId && t.zonaFinId &&
-      t.zonaInicioId !== t.zonaFinId &&
-      (t.framesTotal || 0) >= 2
-    )
-    const MAX_TRACKS = 30
-    const tracksAMostrar = tracksMovimiento.slice(0, MAX_TRACKS)
+    // Trayectorias individuales: polilíneas REALES (recorrido punto-por-punto)
+    // Cada trayectoria viene del endpoint /trayectorias como { trackId, puntos: [{x,y}] }
+    // con coordenadas normalizadas 0-1.
+    const MAX_TRACKS = 40
+    const trayectoriasValidas = trayectorias.filter(t => (t.puntos?.length || 0) >= 2)
+    const trayectoriasAMostrar = trayectoriasValidas.slice(0, MAX_TRACKS)
 
-    if (tracksAMostrar.length > 0) {
+    if (trayectoriasAMostrar.length > 0) {
       const palette = ['#f97316','#06b6d4','#10b981','#a855f7','#f43f5e','#eab308','#3b82f6','#84cc16','#f472b6','#22d3ee']
-      tracksAMostrar.forEach((t, i) => {
-        const from = zoneCenters[t.zonaInicioId]
-        const to   = zoneCenters[t.zonaFinId]
-        if (!from || !to) return
+      trayectoriasAMostrar.forEach((t, i) => {
+        const pts = t.puntos
+          .map(p => ({ x: Number(p.x) * w, y: Number(p.y) * h }))
+          .filter(p => isFinite(p.x) && isFinite(p.y))
+        if (pts.length < 2) return
         const color = palette[i % palette.length]
-        const n     = tracksAMostrar.length
-        const ratio = n > 1 ? (i / (n - 1) - 0.5) : 0
-        const dx    = to.x - from.x
-        const dy    = to.y - from.y
-        const len   = Math.sqrt(dx * dx + dy * dy) || 1
-        const curva = ratio * Math.min(len * 0.4, 50)
-        const cpx   = (from.x + to.x) / 2 - (dy / len) * curva
-        const cpy   = (from.y + to.y) / 2 + (dx / len) * curva
 
+        // Polilínea sólida que conecta los puntos reales en orden temporal
         ctx.beginPath()
-        ctx.moveTo(from.x, from.y)
-        ctx.quadraticCurveTo(cpx, cpy, to.x, to.y)
-        ctx.strokeStyle = color + '77'
-        ctx.lineWidth   = 1.5
-        ctx.setLineDash([5, 4])
-        ctx.stroke()
+        ctx.moveTo(pts[0].x, pts[0].y)
+        for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y)
+        ctx.strokeStyle = color + '99'
+        ctx.lineWidth   = 1.8
         ctx.setLineDash([])
+        ctx.stroke()
+
+        // Punto de inicio (verde) y fin (rojo) para indicar dirección
+        const inicio = pts[0]
+        const fin    = pts[pts.length - 1]
+        ctx.beginPath()
+        ctx.arc(inicio.x, inicio.y, 3, 0, Math.PI * 2)
+        ctx.fillStyle = '#16a34a'
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(fin.x, fin.y, 3, 0, Math.PI * 2)
+        ctx.fillStyle = '#dc2626'
+        ctx.fill()
       })
     }
   }
 
   useEffect(() => {
     if (imgLoaded) draw()
-  }, [imgLoaded, zones, metricas, flujoZonas, tracks])
+  }, [imgLoaded, zones, metricas, flujoZonas, tracks, trayectorias])
 
   // Redibujar cuando el tab se vuelve visible (ResizeObserver detecta cambio de 0 a dimensiones reales)
   useEffect(() => {
@@ -162,14 +165,11 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
     })
     observer.observe(container)
     return () => observer.disconnect()
-  }, [imgLoaded, zones, metricas, flujoZonas, tracks])
+  }, [imgLoaded, zones, metricas, flujoZonas, tracks, trayectorias])
 
-  const tracksConMovimiento = tracks.filter(t =>
-    t.zonaInicioId && t.zonaFinId &&
-    t.zonaInicioId !== t.zonaFinId &&
-    (t.framesTotal || 0) >= 2
-  )
-  const tracksInsuficientes = tracks.length > 0 && tracks.every(t => (t.framesTotal || 0) < 2)
+  const trayectoriasConPuntos = trayectorias.filter(t => (t.puntos?.length || 0) >= 2)
+  const trayectoriasInsuficientes =
+    trayectorias.length > 0 && trayectoriasConPuntos.length === 0
 
   if (!frameSrc) {
     return (
@@ -204,17 +204,22 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
           Sin datos de zonas para visualizar.
         </p>
       )}
-      {flujoZonas.length === 0 && zones.length > 0 && (
+      {flujoZonas.length === 0 && zones.length > 0 && trayectoriasConPuntos.length > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
+          Cada línea es el recorrido real de una persona detectada. En este video las personas se movieron dentro de su zona sin cruzar a otras; cuando hay paso entre zonas, aparecen además flechas de flujo.
+        </p>
+      )}
+      {flujoZonas.length === 0 && zones.length > 0 && trayectoriasConPuntos.length === 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
           No se detectaron movimientos entre zonas. Las burbujas muestran personas únicas por zona.
         </p>
       )}
-      {tracksConMovimiento.length > 0 && (
+      {trayectoriasConPuntos.length > 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#6b7280' }}>
-          Las líneas punteadas muestran trayectorias individuales entre zonas ({tracksConMovimiento.length} personas con movimiento entre zonas).
+          Las líneas sólidas muestran el recorrido real de cada persona ({trayectoriasConPuntos.length} {trayectoriasConPuntos.length === 1 ? 'trayectoria' : 'trayectorias'}). El punto verde marca el inicio y el rojo el final del recorrido.
         </p>
       )}
-      {tracksInsuficientes && (
+      {trayectoriasInsuficientes && (
         <p style={{ margin: '8px 0 0', fontSize: 12, color: '#d97706' }}>
           Este análisis no tiene trayectorias suficientes para visualizar. Las trayectorias requieren al menos 2 puntos de detección por persona. Considera aumentar el fps del análisis para mejor tracking.
         </p>
