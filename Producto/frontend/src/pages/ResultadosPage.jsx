@@ -6,7 +6,7 @@ import { usePolling } from '../hooks/usePolling'
 import TrayectoriasCanvas from '../components/TrayectoriasCanvas'
 import FlujoSankeyChart from '../components/FlujoSankeyChart'
 import MetricasTrackingPanel from '../components/MetricasTrackingPanel'
-import { getTracks, getFlujoZonas, getMetricasTracking, getTrayectorias } from '../api/tracking'
+import { getFlujoZonas, getTrayectorias } from '../api/tracking'
 import VideoValidacion from '../components/VideoValidacion'
 import ResumenEjecutivo from '../components/ResumenEjecutivo'
 import RecomendacionPrecio from '../components/RecomendacionPrecio'
@@ -24,10 +24,8 @@ export default function ResultadosPage() {
   const [frameSrc, setFrameSrc] = useState(null)
   const [bannerVisible, setBannerVisible] = useState(true)
   const [zones, setZones] = useState([])
-  const [tracks, setTracks] = useState([])
   const [trayectorias, setTrayectorias] = useState([])
   const [flujoZonas, setFlujoZonas] = useState([])
-  const [metricasTracking, setMetricasTracking] = useState([])
   const [confiabilidad, setConfiabilidad] = useState(null)
   const [activeTab, setActiveTab] = useState('validacion')
 
@@ -54,10 +52,8 @@ export default function ResultadosPage() {
     api.get(`/videos/${id}/metricas`).then(r => setMetricas(r.data || [])).catch(() => {})
     api.get(`/videos/${id}/metricas-temporales`).then(r => setMetricasTemporales(r.data || [])).catch(() => {})
     api.get(`/videos/${id}/zonas`).then(r => setZones(r.data || [])).catch(() => {})
-    getTracks(id).then(r => setTracks(r.data || [])).catch(() => {})
     getTrayectorias(id).then(r => setTrayectorias(r.data || [])).catch(() => {})
     getFlujoZonas(id).then(r => setFlujoZonas(r.data || [])).catch(() => {})
-    getMetricasTracking(id).then(r => setMetricasTracking(r.data || [])).catch(() => {})
     getConfiabilidad(id).then(r => setConfiabilidad(r.data)).catch(() => {})
   }, [estado, id])
 
@@ -155,7 +151,6 @@ export default function ResultadosPage() {
                 metricasTemporales={metricasTemporales}
                 detecciones={detecciones}
                 frameSrc={frameSrc}
-                zones={zones}
               />
             ),
           },
@@ -177,7 +172,6 @@ export default function ResultadosPage() {
                       zones={zones}
                       metricas={metricas}
                       flujoZonas={flujoZonas}
-                      tracks={tracks}
                       trayectorias={trayectorias}
                     />
                   </Card>
@@ -200,8 +194,6 @@ export default function ResultadosPage() {
                 <div className="section">
                   <MetricasTrackingPanel
                     metricas={metricas}
-                    metricasTracking={metricasTracking}
-                    zones={zones}
                   />
                 </div>
               </div>

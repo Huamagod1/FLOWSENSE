@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const PRIMARY = '#7C3AED'
 
-export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = [], flujoZonas = [], tracks = [], trayectorias = [] }) {
+export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = [], flujoZonas = [], trayectorias = [] }) {
   const canvasRef    = useRef()
   const imgRef       = useRef()
   const containerRef = useRef()
@@ -154,7 +154,7 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
 
   useEffect(() => {
     if (imgLoaded) draw()
-  }, [imgLoaded, zones, metricas, flujoZonas, tracks, trayectorias])
+  }, [imgLoaded, zones, metricas, flujoZonas, trayectorias])
 
   // Redibujar cuando el tab se vuelve visible (ResizeObserver detecta cambio de 0 a dimensiones reales)
   useEffect(() => {
@@ -165,7 +165,7 @@ export default function TrayectoriasCanvas({ frameSrc, zones = [], metricas = []
     })
     observer.observe(container)
     return () => observer.disconnect()
-  }, [imgLoaded, zones, metricas, flujoZonas, tracks, trayectorias])
+  }, [imgLoaded, zones, metricas, flujoZonas, trayectorias])
 
   const trayectoriasConPuntos = trayectorias.filter(t => (t.puntos?.length || 0) >= 2)
   const trayectoriasInsuficientes =

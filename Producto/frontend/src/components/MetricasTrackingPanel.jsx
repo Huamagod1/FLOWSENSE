@@ -3,7 +3,7 @@ import { Card, Statistic, Row, Col, Table } from 'antd'
 const PRIMARY = '#7C3AED'
 const fmt1 = n => (n != null ? n.toFixed(1) : '—')
 
-export default function MetricasTrackingPanel({ metricas = [], metricasTracking = [], zones = [] }) {
+export default function MetricasTrackingPanel({ metricas = [] }) {
   const totalPersonasUnicas = metricas.reduce((s, m) => s + (m.personasUnicas || 0), 0)
   const totalEntradas = metricas.reduce((s, m) => s + (m.entradas || 0), 0)
   const totalOts = metricas.reduce((s, m) => s + (m.otsTracking || 0), 0)

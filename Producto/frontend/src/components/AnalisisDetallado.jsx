@@ -94,9 +94,9 @@ function TooltipRanking({ active, payload, label }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 /**
- * Props: metricas, metricasTemporales, detecciones, frameSrc, zones
+ * Props: metricas, metricasTemporales, detecciones, frameSrc
  */
-export default function AnalisisDetallado({ metricas, metricasTemporales, detecciones, frameSrc, zones }) {
+export default function AnalisisDetallado({ metricas, metricasTemporales, detecciones, frameSrc }) {
   const [imgLoaded, setImgLoaded] = useState(false)
   const canvasRef = useRef()
   const imgRef    = useRef()

@@ -47,7 +47,7 @@ Donde cada componente está normalizado al promedio del recinto. Una zona con sc
 | Capa | Tecnología | Deploy |
 |------|-----------|--------|
 | Frontend | React 18 + Vite + react-router-dom 6 + react-konva + recharts + heatmap.js | Vercel |
-| Backend | Spring Boot 3 + Java 17 + Spring Security + JWT + Spring Mail | Railway |
+| Backend | Spring Boot 3 + Java 21 + Spring Security + JWT + Spring Mail | Railway |
 | Visión IA | Python 3.12 + YOLOv8 (ultralytics 8.3.x) + OpenCV | Proceso invocado vía ProcessBuilder |
 | Base de datos | MySQL 8 | Railway (plugin) |
 | Orquestación local | Docker Compose | Todos los devs |
@@ -88,7 +88,7 @@ FLOWSENSE/
 ├── README.md                       ← portada para humanos
 ├── ALCANCE_COMPLETO.md             ← alcance funcional MVP
 ├── ROADMAP_POST_MVP.md             ← funcionalidades planificadas fuera de alcance
-├── ESTADO_PROYECTO.md              ← snapshot de progreso (se actualiza periódicamente)
+├── TO-DO.md                        ← snapshot de progreso (se actualiza periódicamente)
 ├── docker-compose.yml
 ├── Documentacion/                  ← entregables académicos
 ├── Gestion/                        ← documentos del equipo
@@ -220,7 +220,7 @@ El proyecto es parte de TPY1101 (DuocUC). Las decisiones priorizan:
 
 - Alcance funcional completo: `ALCANCE_COMPLETO.md`
 - Roadmap post-MVP: `ROADMAP_POST_MVP.md`
-- Estado actual: `ESTADO_PROYECTO.md`
+- Estado actual: `TO-DO.md`
 - Detalles Python: `Producto/python/CLAUDE.md`
 - Detalles Backend: `Producto/backend/CLAUDE.md`
 - Detalles Frontend: `Producto/frontend/CLAUDE.md`

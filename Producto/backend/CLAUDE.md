@@ -9,7 +9,7 @@ API REST en Spring Boot 3 que orquesta el sistema completo. Recibe requests de R
 ## Stack del módulo
 
 - Spring Boot 3.2+
-- Java 17 (LTS)
+- Java 21 (LTS)
 - Spring Security + JWT (jjwt 0.12.x)
 - Spring Data JPA
 - Spring Validation
@@ -21,8 +21,8 @@ API REST en Spring Boot 3 que orquesta el sistema completo. Recibe requests de R
 ## Arquitectura de paquetes
 
 ```
-src/main/java/cl/duocuc/flowsense/backend/
-├── BackendApplication.java
+src/main/java/cl/duoc/flowsense/
+├── FlowsenseApplication.java
 ├── config/
 │   ├── SecurityConfig.java
 │   ├── JwtConfig.java

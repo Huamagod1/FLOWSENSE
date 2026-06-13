@@ -23,65 +23,46 @@ SPA (Single Page Application) en React 18 que consume la API REST de Spring Boot
 
 ```
 src/
-├── main.jsx
-├── App.jsx
+├── main.jsx                       ← entrypoint, monta App
+├── App.jsx                        ← define rutas (react-router-dom)
+├── App.css
+├── index.css
 ├── api/
-│   ├── client.js              ← axios + interceptor
-│   ├── auth.js
-│   ├── recintos.js
-│   ├── videos.js
-│   ├── zonas.js
-│   └── metricas.js
-├── auth/
-│   ├── AuthContext.jsx
-│   ├── useAuth.js
-│   └── ProtectedRoute.jsx
-├── pages/
-│   ├── public/
-│   │   ├── Landing.jsx
-│   │   ├── Login.jsx
-│   │   └── Registro.jsx
-│   ├── app/
-│   │   ├── Dashboard.jsx
-│   │   ├── RecintosLista.jsx
-│   │   ├── RecintoDetalle.jsx
-│   │   ├── RecintoForm.jsx
-│   │   ├── SubirVideo.jsx
-│   │   ├── EditorZonas.jsx       ← vista clave: dibuja zonas
-│   │   └── AnalisisResultado.jsx ← vista clave: dashboard
-│   └── errors/
-├── components/
-│   ├── layout/
-│   │   ├── AppLayout.jsx
-│   │   └── PublicLayout.jsx
-│   ├── zonas/                    ← componentes del editor
-│   │   ├── ZonaEditor.jsx        ← canvas react-konva
-│   │   ├── ZonaRectangle.jsx     ← rectángulo individual
-│   │   ├── ZonaToolbar.jsx       ← botones del editor
-│   │   ├── ZonaFormModal.jsx     ← modal para nombrar
-│   │   ├── ZonaList.jsx          ← lista lateral
-│   │   └── FramePreview.jsx      ← imagen de fondo
-│   ├── dashboard/                ← componentes del resultado
-│   │   ├── HeatmapEspacial.jsx
-│   │   ├── TablaZonasScore.jsx
-│   │   ├── MatrizZonaTemporal.jsx
-│   │   ├── DetalleZona.jsx
-│   │   └── InputPrecioBase.jsx
-│   └── common/
-│       ├── Button.jsx
-│       ├── Input.jsx
-│       └── Spinner.jsx
+│   ├── axiosConfig.js            ← axios + interceptor JWT (cliente base)
+│   ├── tracking.js              ← tracks, trayectorias, flujo y métricas de tracking
+│   └── validacion.js            ← confiabilidad / validación del análisis
+├── context/
+│   └── AuthContext.jsx          ← provider de autenticación (token + user)
 ├── hooks/
-│   ├── useRecintos.js
-│   ├── useVideoEstado.js         ← polling de estado
-│   └── useMetricas.js
-├── utils/
-│   ├── validators.js             ← schemas zod
-│   ├── coordenadas.js            ← px ↔ normalizadas
-│   └── formatters.js
-└── styles/
-    └── globals.css
+│   ├── useAuth.js               ← consume AuthContext
+│   └── usePolling.js            ← polling de estado del video
+├── pages/
+│   ├── LoginPage.jsx
+│   ├── RegistroPage.jsx
+│   ├── DashboardPage.jsx
+│   ├── RecintosPage.jsx
+│   ├── RecintoDetallePage.jsx
+│   ├── SubirVideoPage.jsx
+│   ├── EditorZonasPage.jsx      ← vista clave: dibuja zonas (react-konva)
+│   ├── ResultadosPage.jsx       ← vista clave: dashboard de 5 tabs
+│   └── NotFoundPage.jsx
+├── components/
+│   ├── Layout.jsx               ← layout de la app
+│   ├── ProtectedRoute.jsx       ← guard de rutas privadas
+│   ├── VideoValidacion.jsx      ← tab "Validación" (video overlay + confiabilidad)
+│   ├── ResumenEjecutivo.jsx     ← tab "Resumen"
+│   ├── RecomendacionPrecio.jsx  ← tab "Recomendación de precio"
+│   ├── AnalisisDetallado.jsx    ← tab "Análisis detallado" (heatmap, ranking, tabla)
+│   ├── TrayectoriasCanvas.jsx   ← tab "Flujo": canvas de trayectorias reales
+│   ├── FlujoSankeyChart.jsx     ← tab "Flujo": diagrama de flujo entre zonas
+│   └── MetricasTrackingPanel.jsx← tab "Flujo": tabla de métricas de tracking
+└── assets/                        ← imágenes estáticas (hero.png, logos)
 ```
+
+> Nota: este árbol refleja la estructura plana real actual (sin subcarpetas
+> `public/`, `app/`, `zonas/`, `dashboard/`, `common/`, `utils/`, `styles/`).
+> El dashboard de resultados vive en `pages/ResultadosPage.jsx` y reparte sus
+> 5 tabs entre los componentes de `components/`.
 
 ## Vista crítica 1: Editor de Zonas
 
